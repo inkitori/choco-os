@@ -23,24 +23,16 @@ void framebuffer_init()
 
 void framebuffer_clear(uint32_t color)
 {
-	volatile uint32_t *fb_ptr = framebuffer->address;
-
 	for (size_t x = 0; x < framebuffer->width; x++)
 	{
 		for (size_t y = 0; y < framebuffer->height; y++)
 		{
-			// fb_ptr[x + y * framebuffer->width] = color;
-			// size_t fb_index = y * (framebuffer->pitch / sizeof(uint32_t)) + x;
-			// uint32_t *fb = (uint32_t *)fb_ptr;
-
-			// fb[fb_index] = color;
-
 			framebuffer_draw_pixel(x, y, color);
 		}
 	}
 }
 
-void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color)
+static inline void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color)
 {
 	volatile uint32_t *fb_ptr = framebuffer->address;
 
