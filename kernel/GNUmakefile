@@ -85,7 +85,7 @@ override KNASMFLAGS += \
 override CFILES := $(shell cd src && find -L * -type f -name '*.c')
 override ASFILES := $(shell cd src && find -L * -type f -name '*.S')
 override NASMFILES := $(shell cd src && find -L * -type f -name '*.asm')
-override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o) $(NASMFILES:.asm=.asm.o))
+override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o) $(NASMFILES:.asm=.asm.o) cozette.o) # FIXME: create a separate font directory and move cozette.o there
 override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
 # Default target.

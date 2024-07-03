@@ -106,7 +106,9 @@ void _start(void)
     }
 
     framebuffer_init();
-    framebuffer_clear(0xFFFFFF);
+    framebuffer_clear(0x272C34);
+
+    framebuffer_put_string("ChocoMint", 0, 0, 0xFFFFFF, 0x272C34);
 
     // We're done, just hang...
     hcf();
