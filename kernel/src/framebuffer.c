@@ -94,7 +94,7 @@ void framebuffer_put_char(
 	uint32_t fg, uint32_t bg)
 {
 	int scanline = framebuffer->pitch;
-	volatile uint32_t *fb = framebuffer->address;
+	volatile char *fb = framebuffer->address;
 
 	/* cast the address to PSF header struct */
 	PSF_font *font = (PSF_font *)&_binary_cozette_psf_start;
@@ -115,7 +115,7 @@ void framebuffer_put_char(
 	   we only do this once, and adjust the offset later. This is faster. */
 	int offs =
 		(cy * font->height * scanline) +
-		(cx * (font->width + 1) * sizeof(PIXEL));
+		(cx * (font->width) * sizeof(PIXEL));
 	/* finally display pixels according to the bitmap */
 	int x, y, line, mask;
 	for (y = 0; y < font->height; y++)
