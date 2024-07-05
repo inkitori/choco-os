@@ -5,6 +5,29 @@
 
 #include "framebuffer.h"
 #include "asm_wrappers.h"
+#include "idt.h"
+
+void to_string(uint64_t num, char *str)
+{
+    int i = 0;
+    while (num > 0)
+    {
+        str[i] = num % 10 + '0';
+        num /= 10;
+        i++;
+    }
+    str[i] = '\0';
+    int j = 0;
+    i--;
+    while (j < i)
+    {
+        char temp = str[j];
+        str[j] = str[i];
+        str[i] = temp;
+        j++;
+        i--;
+    }
+}
 
 // Set the base revision to 2, this is recommended as this is the latest
 // base revision described by the Limine boot protocol specification.
@@ -24,6 +47,9 @@ __attribute__((used, section(".requests_start_marker"))) static volatile LIMINE_
 
 __attribute__((used, section(".requests_end_marker"))) static volatile LIMINE_REQUESTS_END_MARKER;
 
+__attribute__((used, section(".requests"))) static volatile struct limine_memmap_request memmap_request = {
+    .id = LIMINE_MEMMAP_REQUEST,
+    .revision = 0};
 // GCC and Clang reserve the right to generate calls to the following
 // 4 functions even if they are not directly called.
 // Implement them as the C specification mandates.
@@ -108,7 +134,78 @@ void _start(void)
     framebuffer_init();
     framebuffer_clear(0x272C34);
 
-    framebuffer_put_string("ChocoOS", 0, 0, 0xFFFFFF, 0x272C34);
+    // framebuffer_put_string("ChocoOS", 0, 0, 0xFFFFFF, 0x272C34);
+    // framebuffer_put_string(">", 0, 16, 0xFFFFFF, 0x272C34);
+
+    struct limine_memmap_entry **entries = memmap_request.response->entries;
+
+    for (int i = 0; i < memmap_request.response->entry_count; i++)
+    {
+        uint64_t memory_type = entries[i]->type;
+
+        char baseBuf[64];
+        to_string(entries[i]->base, baseBuf);
+
+        char lengthBuf[64];
+        to_string(entries[i]->length, lengthBuf);
+
+        switch (memory_type)
+        {
+        case LIMINE_MEMMAP_USABLE:
+            framebuffer_put_string("[Usable RAM]", 0, 3 * i, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
+            break;
+
+        case LIMINE_MEMMAP_RESERVED:
+            framebuffer_put_string("[Reserved]", 0, 3 * i, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
+            break;
+
+        case LIMINE_MEMMAP_ACPI_RECLAIMABLE:
+            framebuffer_put_string("[ACPI Reclaimable]", 0, 3 * i, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
+            break;
+
+        case LIMINE_MEMMAP_ACPI_NVS:
+            framebuffer_put_string("[ACPI NVS]", 0, 3 * i, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
+            break;
+
+        case LIMINE_MEMMAP_BAD_MEMORY:
+            framebuffer_put_string("[Bad Memory]", 0, 3 * i, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
+            break;
+
+        case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
+            framebuffer_put_string("[Bootloader Reclaimable]", 0, 3 * i, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
+            break;
+
+        case LIMINE_MEMMAP_KERNEL_AND_MODULES:
+            framebuffer_put_string("[Kernel & Modules]", 0, 3 * i, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
+            break;
+
+        case LIMINE_MEMMAP_FRAMEBUFFER:
+            framebuffer_put_string("[Framebuffer]", 0, 3 * i, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
+            framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
+            break;
+
+        default:
+            // Handle unknown memory types or add logging/error handling
+            break;
+        }
+    }
+
+    idt_init();
 
     // We're done, just hang...
     hcf();
