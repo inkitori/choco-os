@@ -1,8 +1,9 @@
 #include "idt.h"
 #include "stdbool.h"
+#include "framebuffer.h"
 
 #define IDT_MAX_DESCRIPTORS 256
-#define GDT_OFFSET_KERNEL_CODE 0x0
+#define GDT_OFFSET_KERNEL_CODE 0x28
 
 static bool vectors[IDT_MAX_DESCRIPTORS];
 
@@ -14,6 +15,8 @@ __attribute__((aligned(0x10))) static idt_entry_t idt[256]; // Create an array o
 
 __attribute__((noreturn)) void exception_handler()
 {
+	framebuffer_clear(0x000000);
+	framebuffer_put_string("Exception occurred; system halted", 0, 0, 0xFF0000, 0x000000);
 	__asm__ volatile("cli; hlt"); // Completely hangs the computer
 }
 

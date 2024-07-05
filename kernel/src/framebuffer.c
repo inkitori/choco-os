@@ -4,6 +4,8 @@
 #include "asm_wrappers.h"
 #include "framebuffer.h"
 
+static inline void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color);
+
 __attribute__((used, section(".requests"))) static volatile struct limine_framebuffer_request framebuffer_request = {
 	.id = LIMINE_FRAMEBUFFER_REQUEST,
 	.revision = 0};
