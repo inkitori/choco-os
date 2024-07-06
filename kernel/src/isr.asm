@@ -1,5 +1,6 @@
 SECTION .text
 extern exception_handler
+extern keyboard_handler
 global trigger_test_interrupt
 
 trigger_test_interrupt:
@@ -7,14 +8,16 @@ trigger_test_interrupt:
 
 %macro isr_err_stub 1
 isr_stub_%+%1:
+	mov rdi, %+%1
     call exception_handler
-    iret 
+    iretq
 %endmacro
 ; if writing for 64-bit, use iretq instead
 %macro isr_no_err_stub 1
 isr_stub_%+%1:
+	mov rdi, %+%1
     call exception_handler
-    iret
+    iretq
 %endmacro
 
 isr_no_err_stub 0
@@ -49,12 +52,14 @@ isr_no_err_stub 28
 isr_no_err_stub 29
 isr_err_stub    30
 isr_no_err_stub 31
+isr_no_err_stub 32 ; keyboard
+isr_no_err_stub 33
 
 SECTION .data
 global isr_stub_table
 isr_stub_table:
-%assign i 0 
-%rep    32 
+%assign i 0
+%rep    34
     dq isr_stub_%+i 
 %assign i i+1 
 %endrep
