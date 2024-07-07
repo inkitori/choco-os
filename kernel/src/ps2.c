@@ -122,6 +122,7 @@ static void ps2_test_port_response_byte(uint8_t response)
 	}
 }
 
+// TODO: split up this function
 void ps2_init_controller()
 {
 	// TODO: Initialise USB controller and disable USB legacy support
@@ -262,4 +263,6 @@ void ps2_init_controller()
 		term_print("Skipping PS/2 second port reset");
 
 	ps2_data_in(); // tbh im not sure if i need to leave this here, looks like it's just remnants from the mouse handler on port 2 spitting out 0x0 so ill flush it anyways
+
+	term_print("PS/2 controller initialised");
 }
