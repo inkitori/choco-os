@@ -5,28 +5,24 @@
 #include "io.h"
 #include "lib.h"
 #include "term.h"
+#include "keyboard.h"
 
-void timer_handler()
+void isr_timer_handler()
 {
 	// term_print("Timer interrupt");
 
-	pic_send_eoi(0);
+	pic_send_eoi(PIC_TIMER_IRQ_LINE);
 }
 
-void keyboard_handler()
+void isr_keyboard_handler()
 {
-	term_print("Keyboard Interrupt Raised");
-	uint8_t scan_code = ps2_data_in();
+	// term_print("Keyboard Interrupt Raised");
+	keyboard_handler();
 
-	char buf[64];
-	// term_clear(TERM_COLOR_BLACK);
-	to_string(scan_code, buf);
-	term_print(buf);
-
-	pic_send_eoi(1);
+	pic_send_eoi(PIC_KEYBOARD_IRQ_LINE);
 }
 
-__attribute__((noreturn)) void exception_handler(uint64_t exception)
+__attribute__((noreturn)) void isr_exception_handler(uint64_t exception)
 {
 	char buffer[64];
 	to_string(exception, buffer);

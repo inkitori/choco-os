@@ -25,28 +25,28 @@ void framebuffer_init()
 
 void framebuffer_clear(uint32_t color)
 {
-	for (size_t x = 0; x < framebuffer->width; x++)
+	for (uint64_t x = 0; x < framebuffer->width; x++)
 	{
-		for (size_t y = 0; y < framebuffer->height; y++)
+		for (uint64_t y = 0; y < framebuffer->height; y++)
 		{
 			framebuffer_draw_pixel(x, y, color);
 		}
 	}
 }
 
-static inline void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color)
+// FIXME: FIX THIS
+static void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color)
 {
-	volatile uint32_t *fb_ptr = framebuffer->address;
+	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
 
 	if (x >= framebuffer->width || y >= framebuffer->height)
 	{
 		return;
 	}
 
-	size_t fb_index = y * (framebuffer->pitch / sizeof(uint32_t)) + x;
-	uint32_t *fb = (uint32_t *)fb_ptr;
+	size_t fb_index = y * (framebuffer->pitch / (framebuffer->bpp / 8)) + x;
 
-	fb[fb_index] = color;
+	fb_ptr[fb_index] = color;
 }
 
 #define PSF1_FONT_MAGIC 0x0436

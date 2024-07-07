@@ -13,6 +13,7 @@ extern void trigger_test_interrupt(void);
 #include "ps2.h"
 #include "keyboard.h"
 #include "pic.h"
+#include "shell.h"
 
 __attribute__((used, section(".requests"))) static volatile LIMINE_BASE_REVISION(2);
 
@@ -45,9 +46,8 @@ void _start(void)
     pic_init();
     idt_init();
 
-    while (1)
-    {
-    }
+    // trigger_test_interrupt();
+    shell_init();
 
     term_print("Hopefully you can't see this");
 }

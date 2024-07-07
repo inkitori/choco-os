@@ -1,39 +1,39 @@
 %include "src/asm_utils.asm"
 
 SECTION .text
-extern exception_handler
+extern isr_exception_handler
 global trigger_test_interrupt
 
 trigger_test_interrupt:
-    int 0xD
+    int 0xE
 
-
-extern keyboard_handler
-extern timer_handler
+extern isr_keyboard_handler
+extern isr_timer_handler
 
 isr_timer:
     pushaq
-    call timer_handler
+    call isr_timer_handler
     popaq
     iretq
 
 isr_keyboard:
     pushaq
-    call keyboard_handler
+    cld
+    call isr_keyboard_handler
     popaq
     iretq
 
 %macro isr_err_stub 1
 isr_stub_%+%1:
 	mov rdi, %+%1
-    call exception_handler
+    call isr_exception_handler
     iretq
 %endmacro
 
 %macro isr_no_err_stub 1
 isr_stub_%+%1:
 	mov rdi, %+%1
-    call exception_handler
+    call isr_exception_handler
     iretq
 %endmacro
 

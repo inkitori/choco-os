@@ -258,11 +258,11 @@ void ps2_init_controller()
 		ps2_data_out(DEVICE_COMMAND_RESET);
 
 		ps2_test_device_reset_response_byte(ps2_data_in());
+
+		ps2_data_in(); // tbh im not sure if i need to leave this here, looks like it's just remnants from the mouse handler on port 2 spitting out 0x0 so ill flush it anyways
 	}
 	else
 		term_print("Skipping PS/2 second port reset");
-
-	ps2_data_in(); // tbh im not sure if i need to leave this here, looks like it's just remnants from the mouse handler on port 2 spitting out 0x0 so ill flush it anyways
 
 	term_print("PS/2 controller initialised");
 }
