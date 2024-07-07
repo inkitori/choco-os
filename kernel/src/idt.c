@@ -152,7 +152,7 @@ void PIC_sendEOI(uint8_t irq)
 
 void timer_handler()
 {
-	term_print("Timer interrupt");
+	// term_print("Timer interrupt");
 
 	PIC_sendEOI(0);
 }
@@ -162,7 +162,7 @@ void keyboard_handler()
 	uint8_t scan_code = ps2_data_in();
 
 	char buf[64];
-	term_clear(TERM_COLOR_BLACK);
+	// term_clear(TERM_COLOR_BLACK);
 	to_string(scan_code, buf);
 	term_print(buf);
 
