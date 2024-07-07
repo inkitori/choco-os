@@ -1,6 +1,5 @@
 SECTION .text
 extern exception_handler
-extern keyboard_handler
 global trigger_test_interrupt
 
 trigger_test_interrupt:

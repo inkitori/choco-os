@@ -1,0 +1,246 @@
+#include "term.h"
+#include "io.h"
+#include "ps2.h"
+#include "stdbool.h"
+#include "asm_wrappers.h"
+#include "lib.h"
+
+static bool dual_channel = false;
+
+static inline void ps2_wait_for_output_buf()
+{
+	while (!(inb(STATUS_REGISTER) & STATUS_OUTPUT_BUFFER_MASK))
+		;
+}
+
+static inline void ps2_wait_for_input_buf()
+{
+	while (inb(STATUS_REGISTER) & STATUS_INPUT_BUFFER_MASK)
+		;
+}
+
+void ps2_data_out(uint8_t data)
+{
+	ps2_wait_for_input_buf();
+
+	outb(DATA_PORT, data);
+}
+
+uint8_t ps2_data_in()
+{
+	ps2_wait_for_output_buf();
+
+	return inb(DATA_PORT);
+}
+
+static inline void ps2_test_device_reset_response_byte(uint8_t response)
+{
+	if (response == DEVICE_ACK)
+	{
+		term_print("PS/2 device reset acknowledged");
+
+		uint8_t self_test_response = ps2_data_in();
+
+		switch (self_test_response)
+		{
+
+		case DEVICE_SELF_TEST_PASSED:
+			term_print_success("PS/2 device self test passed");
+			break;
+
+		case DEVICE_SELF_TEST_FAILED_1:
+			term_print_error("PS/2 device self test failed: First failure code");
+			hcf();
+		case DEVICE_SELF_TEST_FAILED_2:
+			term_print_error("PS/2 device self test failed: Second failure code");
+			hcf();
+		default:
+			term_print_error("PS/2 device self test failed: Unknown response byte");
+			char buf[64];
+
+			to_string(self_test_response, buf);
+			term_print(buf);
+			hcf();
+		}
+	}
+	else if (response == DEVICE_RESEND)
+	{
+		term_print_error("PS/2 device reset request resent");
+		hcf();
+	}
+	else
+	{
+		term_print_error("PS/2 device reset failed: Unknown response byte");
+		char buf[64];
+
+		to_string(response, buf);
+		term_print(buf);
+		hcf();
+	}
+}
+
+static inline void ps2_test_port_response_byte(uint8_t response)
+{
+	switch (response)
+	{
+	case RESPONSE_PORT_TEST_PASSED:
+		term_print_success("PS/2 port test passed");
+		break;
+	case RESPONSE_PORT_TEST_CLOCK_LOW:
+		term_print_error("PS/2 port test failed: Clock line low");
+		hcf();
+	case RESPONSE_PORT_TEST_CLOCK_HIGH:
+		term_print_error("PS/2 port test failed: Clock line high");
+		hcf();
+	case RESPONSE_PORT_TEST_DATA_LOW:
+		term_print_error("PS/2 port test failed: Data line low");
+		hcf();
+	case RESPONSE_PORT_TEST_DATA_HIGH:
+		term_print_error("PS/2 port test failed: Data line high");
+		hcf();
+	default:
+		term_print_error("PS/2 port test failed: Unknown response byte");
+		hcf();
+	}
+}
+
+void ps2_init_controller()
+{
+	// TODO: Initialise USB controller and disable USB legacy support
+	// TODO: Check for existence of PS/2 controller
+
+	// Disabling PS/2 devices
+	term_print("Disabling PS/2 devices");
+
+	outb(COMMAND_PORT, COMMAND_DISABLE_FIRST_PORT);
+	outb(COMMAND_PORT, COMMAND_DISABLE_SECOND_PORT);
+
+	// Flushing the output buffer
+	term_print("Flushing PS/2 output buffer");
+
+	while (inb(STATUS_REGISTER) & STATUS_OUTPUT_BUFFER_MASK)
+		inb(DATA_PORT);
+
+	// Disabling IRQs and translation
+	term_print("Flushing PS/2 output buffer");
+
+	outb(COMMAND_PORT, COMMAND_READ_CONFIG_BYTE);
+	while (!(inb(STATUS_REGISTER) & STATUS_OUTPUT_BUFFER_MASK))
+		;
+
+	uint8_t config_byte = inb(DATA_PORT);
+	config_byte &= ~(CONFIG_FIRST_PORT_INTERRUPT_MASK | CONFIG_SECOND_PORT_INTERRUPT_MASK | CONFIG_FIRST_PORT_TRANSLATION_MASK);
+	outb(COMMAND_PORT, COMMAND_WRITE_CONFIG_BYTE);
+
+	ps2_data_out(config_byte);
+
+	// Testing for dual channel
+	dual_channel = (config_byte & CONFIG_SECOND_PORT_CLOCK_MASK);
+	if (dual_channel)
+	{
+		term_print_success("PS/2 initially detected as dual channel");
+	}
+	else
+	{
+		term_print_success("PS/2 confirmed as single channel");
+	}
+
+	// Performing controller self test
+	term_print("Initiating PS/2 controller self test");
+
+	outb(COMMAND_PORT, COMMAND_TEST_CONTROLLER);
+
+	uint8_t response = ps2_data_in();
+
+	if (response == RESPONSE_CONTROLLER_TEST_PASSED)
+	{
+		term_print_success("PS/2 controller self test passed");
+	}
+	else
+	{
+		term_print_error("PS/2 controller self test failed");
+		hcf();
+	}
+
+	// determining if the controller has a second channel
+	if (dual_channel)
+	{
+		outb(COMMAND_PORT, COMMAND_ENABLE_SECOND_PORT);
+		outb(COMMAND_PORT, COMMAND_READ_CONFIG_BYTE);
+
+		config_byte = ps2_data_in();
+
+		dual_channel = !(config_byte & CONFIG_SECOND_PORT_CLOCK_MASK);
+
+		if (dual_channel)
+		{
+			term_print_success("PS/2 confirmed as dual channel");
+		}
+		else
+		{
+			term_print_success("PS/2 confirmed as single channel");
+		}
+	}
+
+	// Testing PS/2 ports
+
+	// Testing first port
+	outb(COMMAND_PORT, COMMAND_TEST_FIRST_PORT);
+
+	term_print("Testing PS/2 first port");
+	ps2_test_port_response_byte(ps2_data_in());
+
+	if (dual_channel)
+	{
+		// Testing second port
+		outb(COMMAND_PORT, COMMAND_TEST_SECOND_PORT);
+
+		term_print("Testing PS/2 second port");
+		ps2_test_port_response_byte(ps2_data_in());
+	}
+	else
+		term_print("Skipping PS/2 second port test");
+
+	// Enabling PS/2 devices
+	term_print("Enabling PS/2 devices");
+
+	outb(COMMAND_PORT, COMMAND_ENABLE_FIRST_PORT);
+	if (dual_channel)
+		outb(COMMAND_PORT, COMMAND_ENABLE_SECOND_PORT);
+
+	// Enabling PS/2 IRQs
+	term_print("Enabling PS/2 IRQs");
+
+	outb(COMMAND_PORT, COMMAND_READ_CONFIG_BYTE);
+
+	config_byte = ps2_data_in();
+	config_byte |= CONFIG_FIRST_PORT_INTERRUPT_MASK;
+	if (dual_channel)
+		config_byte |= CONFIG_SECOND_PORT_INTERRUPT_MASK;
+
+	outb(COMMAND_PORT, COMMAND_WRITE_CONFIG_BYTE);
+
+	ps2_data_out(config_byte);
+
+	// Reset devices
+	term_print("Resetting PS/2 devices");
+
+	term_print("Resetting PS/2 devices on port 1");
+
+	ps2_data_out(DEVICE_COMMAND_RESET);
+
+	ps2_test_device_reset_response_byte(ps2_data_in());
+
+	if (dual_channel)
+	{
+		term_print("Resetting PS/2 devices on port 2");
+
+		outb(COMMAND_PORT, COMMAND_WRITE_SECOND_PORT);
+
+		ps2_data_out(DEVICE_COMMAND_RESET);
+
+		ps2_test_device_reset_response_byte(ps2_data_in());
+	}
+	else
+		term_print("Skipping PS/2 second port reset");
+}

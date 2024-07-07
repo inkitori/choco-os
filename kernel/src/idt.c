@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "io.h"
 
 #include "stdbool.h"
 #include "framebuffer.h"
@@ -12,30 +13,6 @@ static bool vectors[IDT_MAX_DESCRIPTORS];
 extern void *isr_stub_table[];
 
 static idtr_t idtr;
-
-static inline uint8_t inb(uint16_t port)
-{
-	uint8_t ret;
-	__asm__ volatile("inb %w1, %b0"
-					 : "=a"(ret)
-					 : "Nd"(port)
-					 : "memory");
-	return ret;
-}
-
-static inline void outb(uint16_t port, uint8_t val)
-{
-	__asm__ volatile("outb %b0, %w1" : : "a"(val), "Nd"(port) : "memory");
-	/* There's an outb %al, $imm8 encoding, for compile-time constant port numbers that fit in 8b. (N constraint).
-	 * Wider immediate constants would be truncated at assemble-time (e.g. "i" constraint).
-	 * The  outb  %al, %dx  encoding is the only option for all other cases.
-	 * %1 expands to %dx because  port  is a uint16_t.  %w1 could be used if we had the port number a wider C type */
-}
-
-static inline void io_wait(void)
-{
-	outb(0x80, 0);
-}
 
 #define PIC1 0x20 /* IO base address for master PIC */
 #define PIC2 0xA0 /* IO base address for slave PIC */
@@ -185,26 +162,86 @@ void idt_init()
 	idt_set_descriptor(33, isr_stub_table[33], 0x8E);
 	vectors[33] = true;
 
-	PIC_remap(0x20, 0x28);
-	// IRQ_clear_mask(0);
-	IRQ_clear_mask(1);
-
-	__asm__ volatile("lidt %0" : : "m"(idtr));
-	__asm__ volatile("sti");
-
 #define KB_CONTROLLER_DATA 0x60	   // keyboard controller data register
 #define KB_CONTROLLER_COMMAND 0x64 // keyboard controller command register
-								   // while (inb(KB_CONTROLLER_COMMAND) & 0x1)
-								   // {
-								   // 	inb(KB_CONTROLLER_DATA);
-								   // 	io_wait();
-								   // }
 
-	// io_wait();
+	// Disabling PS/2 Devices
+	outb(KB_CONTROLLER_COMMAND, 0xAD);
+	outb(KB_CONTROLLER_COMMAND, 0xA7);
+
+	// Flushing output buffer
+	inb(KB_CONTROLLER_DATA);
+
+	// clearing bits 0 1 and 6 of the configuration byte
+	outb(KB_CONTROLLER_COMMAND, 0x20);
+	uint8_t configByte = inb(KB_CONTROLLER_DATA);
+
+	configByte ^= 1 << 0;
+	configByte ^= 1 << 1;
+	configByte ^= 1 << 6;
+
+	outb(KB_CONTROLLER_COMMAND, 0x60);
+	while (inb(KB_CONTROLLER_COMMAND) & 0x2)
+	{
+		io_wait();
+	}
+
+	outb(KB_CONTROLLER_DATA, configByte);
+
+	// self test
+	outb(KB_CONTROLLER_COMMAND, 0xAA);
+
+	while (!(inb(KB_CONTROLLER_COMMAND) & 0x1))
+	{
+		io_wait();
+	}
+
+	uint8_t selfCheck = inb(KB_CONTROLLER_DATA);
+
+	if (selfCheck != 0x55)
+	{
+		framebuffer_clear(0x000000);
+		framebuffer_put_string("PS/2 controller self test failed", 0, 0, 0xFF0000, 0x000000);
+		__asm__ volatile("cli; hlt");
+	}
+
+	// Re enabling PS/2 Ports
+	outb(KB_CONTROLLER_COMMAND, 0xAE);
+
+	// Setting bit 0 of the configuration byte
+	outb(KB_CONTROLLER_COMMAND, 0x20);
+	configByte = inb(KB_CONTROLLER_DATA);
+
+	configByte |= 1 << 0;
+
+	outb(KB_CONTROLLER_COMMAND, 0x60);
+	while (inb(KB_CONTROLLER_COMMAND) & 0x2)
+	{
+		io_wait();
+	}
+
+	outb(KB_CONTROLLER_DATA, configByte);
+
+	outb(KB_CONTROLLER_DATA, 0xFF);
+
+	while (inb(KB_CONTROLLER_DATA) != 0xAA)
+	{
+		io_wait();
+	}
 
 	while (inb(KB_CONTROLLER_COMMAND) & 0x2)
 	{
 		outb(KB_CONTROLLER_DATA, 0xF4);
 		io_wait();
 	}
+
+	framebuffer_clear(0x000000);
+	framebuffer_put_string("LIDT", 0, 0, 0xFF0000, 0x000000);
+
+	PIC_remap(0x20, 0x28);
+	// IRQ_clear_mask(0);
+	IRQ_clear_mask(1);
+
+	__asm__ volatile("lidt %0" : : "m"(idtr));
+	__asm__ volatile("sti");
 }

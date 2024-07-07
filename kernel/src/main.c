@@ -9,6 +9,8 @@ extern void trigger_test_interrupt(void);
 #include "asm_wrappers.h"
 #include "idt.h"
 #include "lib.h"
+#include "term.h"
+#include "ps2.h"
 
 __attribute__((used, section(".requests"))) static volatile LIMINE_BASE_REVISION(2);
 
@@ -35,10 +37,8 @@ void _start(void)
         hcf();
     }
 
-    framebuffer_init();
-    framebuffer_clear(0x272C34);
-
-    framebuffer_put_string("ChocoOS", 0, 0, 0xFFFFFF, 0x272C34);
+    term_init();
+    ps2_init_controller();
 
     // struct limine_memmap_entry **entries = memmap_request.response->entries;
 
@@ -108,9 +108,9 @@ void _start(void)
     //     }
     // }
 
-    idt_init();
+    // idt_init();
 
-    framebuffer_put_string("IDT Loaded", 0, 1, 0xFFFFFF, 0x272C34);
+    // framebuffer_put_string("IDT Loaded", 0, 1, 0xFFFFFF, 0x272C34);
 
     // trigger_test_interrupt();
 
