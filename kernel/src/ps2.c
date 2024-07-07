@@ -33,6 +33,18 @@ uint8_t ps2_data_in()
 	return inb(DATA_PORT);
 }
 
+void print_config_byte()
+{
+	char config_byte_buf[64];
+
+	outb(COMMAND_PORT, COMMAND_READ_CONFIG_BYTE);
+	uint8_t config_byte = ps2_data_in();
+
+	to_string(config_byte, config_byte_buf);
+	term_print("Config byte: ");
+	term_print(config_byte_buf);
+}
+
 static inline void ps2_test_device_reset_response_byte(uint8_t response)
 {
 	if (response == DEVICE_ACK)
@@ -122,11 +134,12 @@ void ps2_init_controller()
 		inb(DATA_PORT);
 
 	// Disabling IRQs and translation
-	term_print("Flushing PS/2 output buffer");
+	term_print("Disabling PS/2 IRQs and translation");
 
 	outb(COMMAND_PORT, COMMAND_READ_CONFIG_BYTE);
 
 	uint8_t config_byte = ps2_data_in();
+
 	config_byte &= ~(CONFIG_FIRST_PORT_INTERRUPT_MASK | CONFIG_SECOND_PORT_INTERRUPT_MASK | CONFIG_FIRST_PORT_TRANSLATION_MASK);
 	outb(COMMAND_PORT, COMMAND_WRITE_CONFIG_BYTE);
 
@@ -241,4 +254,6 @@ void ps2_init_controller()
 	}
 	else
 		term_print("Skipping PS/2 second port reset");
+
+	ps2_data_in(); // tbh im not sure if i need to leave this here, looks like it's just remnants from the mouse handler on port 2 spitting out 0x0 so ill flush it anyways
 }

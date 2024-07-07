@@ -1,3 +1,3 @@
-# Chocomint OS
+# Choco OS
 
-Game of Life
+choco

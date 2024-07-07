@@ -5,6 +5,41 @@ global trigger_test_interrupt
 trigger_test_interrupt:
     int 0xD
 
+%macro pushaq 0
+    push rax
+    push rcx
+    push rdx
+    push rbx
+    push rbp
+    push rsi
+    push rdi
+%endmacro
+
+%macro popaq 0
+    pop rdi
+    pop rsi
+    pop rbp
+    pop rbx
+    pop rdx
+    pop rcx
+    pop rax
+%endmacro
+
+extern keyboard_handler
+extern timer_handler
+
+isr_timer:
+    pushaq
+    call timer_handler
+    popaq
+    iretq
+
+isr_keyboard:
+    pushaq
+    call keyboard_handler
+    popaq
+    iretq
+
 %macro isr_err_stub 1
 isr_stub_%+%1:
 	mov rdi, %+%1
@@ -58,7 +93,9 @@ SECTION .data
 global isr_stub_table
 isr_stub_table:
 %assign i 0
-%rep    34
+%rep    32
     dq isr_stub_%+i 
 %assign i i+1 
 %endrep
+dq isr_timer
+dq isr_keyboard

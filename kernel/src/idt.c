@@ -5,6 +5,7 @@
 #include "framebuffer.h"
 #include "lib.h"
 #include "term.h"
+#include "ps2.h"
 
 #define IDT_MAX_DESCRIPTORS 256
 #define GDT_OFFSET_KERNEL_CODE 0x28
@@ -126,13 +127,6 @@ __attribute__((noreturn)) void exception_handler(uint64_t exception)
 	__asm__ volatile("cli; hlt"); // Completely hangs the computer
 }
 
-__attribute__((noreturn)) void keyboard_handler()
-{
-	framebuffer_clear(0x000000);
-	framebuffer_put_string("Keyboard IRQ raised 1", 0, 0, 0xFF0000, 0x000000);
-	__asm__ volatile("cli; hlt"); // Completely hangs the computer
-}
-
 void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags)
 {
 	idt_entry_t *descriptor = &idt[vector];
@@ -144,6 +138,35 @@ void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags)
 	descriptor->isr_mid = ((uint64_t)isr >> 16) & 0xFFFF;
 	descriptor->isr_high = ((uint64_t)isr >> 32) & 0xFFFFFFFF;
 	descriptor->reserved = 0;
+}
+
+#define PIC_EOI 0x20 /* End-of-interrupt command code */
+
+void PIC_sendEOI(uint8_t irq)
+{
+	if (irq >= 8)
+		outb(PIC2_COMMAND, PIC_EOI);
+
+	outb(PIC1_COMMAND, PIC_EOI);
+}
+
+void timer_handler()
+{
+	term_print("Timer interrupt");
+
+	PIC_sendEOI(0);
+}
+
+void keyboard_handler()
+{
+	uint8_t scan_code = ps2_data_in();
+
+	char buf[64];
+	term_clear(TERM_COLOR_BLACK);
+	to_string(scan_code, buf);
+	term_print(buf);
+
+	PIC_sendEOI(1);
 }
 
 void idt_init()
