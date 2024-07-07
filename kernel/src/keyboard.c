@@ -24,18 +24,18 @@ void keyboard_init()
 
 void keyboard_handler()
 {
-	// term_print("Keyboard handler");
 	uint8_t scan_code = ps2_data_in();
 
-	term_print("scan code: ");
+	// term_print("scan code: ");
 	char buf[10];
 	to_string(scan_code, buf);
 
-	term_print(buf);
+	// term_print(buf);
 
 	switch (scan_code)
 	{
 	case 0x1C:
+		term_print("Keyboard handler");
 		charBuf = 'a';
 		break;
 	case 0x32:
@@ -48,13 +48,23 @@ void keyboard_handler()
 
 	buf[0] = charBuf;
 	buf[1] = '\0';
-	term_print(buf);
+	// term_print(buf);
 }
 
 char keyboard_getchar()
 {
-	while (charBuf == 0)
-		;
+	while (1)
+	{
+		char buf[10];
+		buf[0] = charBuf;
+		buf[1] = '\0';
+		term_print(buf);
+
+		if (charBuf != 0)
+		{
+			break;
+		}
+	}
 
 	term_print("fnally out");
 

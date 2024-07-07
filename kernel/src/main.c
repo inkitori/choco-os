@@ -49,5 +49,8 @@ void _start(void)
     // trigger_test_interrupt();
     shell_init();
 
+    while (1)
+        ;
+
     term_print("Hopefully you can't see this");
 }
