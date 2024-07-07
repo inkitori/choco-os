@@ -11,6 +11,7 @@ extern void trigger_test_interrupt(void);
 #include "lib.h"
 #include "term.h"
 #include "ps2.h"
+#include "keyboard.h"
 
 __attribute__((used, section(".requests"))) static volatile LIMINE_BASE_REVISION(2);
 
@@ -39,6 +40,7 @@ void _start(void)
 
     term_init();
     ps2_init_controller();
+    keyboard_init();
 
     // struct limine_memmap_entry **entries = memmap_request.response->entries;
 
@@ -113,6 +115,8 @@ void _start(void)
     // framebuffer_put_string("IDT Loaded", 0, 1, 0xFFFFFF, 0x272C34);
 
     // trigger_test_interrupt();
+
+    // idt_init();
 
     while (1)
     {

@@ -1,5 +1,6 @@
 #ifndef PS2_H
 #define PS2_H
+#include <stdint.h>
 
 #define DATA_PORT 0x60
 #define STATUS_REGISTER 0x64
@@ -51,5 +52,8 @@
 #define CONFIG_FIRST_PORT_TRANSLATION_MASK (1 << CONFIG_FIRST_PORT_TRANSLATION)
 
 void ps2_init_controller();
+
+void ps2_data_out(uint8_t data);
+uint8_t ps2_data_in();
 
 #endif

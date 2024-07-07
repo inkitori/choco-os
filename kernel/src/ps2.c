@@ -125,10 +125,8 @@ void ps2_init_controller()
 	term_print("Flushing PS/2 output buffer");
 
 	outb(COMMAND_PORT, COMMAND_READ_CONFIG_BYTE);
-	while (!(inb(STATUS_REGISTER) & STATUS_OUTPUT_BUFFER_MASK))
-		;
 
-	uint8_t config_byte = inb(DATA_PORT);
+	uint8_t config_byte = ps2_data_in();
 	config_byte &= ~(CONFIG_FIRST_PORT_INTERRUPT_MASK | CONFIG_SECOND_PORT_INTERRUPT_MASK | CONFIG_FIRST_PORT_TRANSLATION_MASK);
 	outb(COMMAND_PORT, COMMAND_WRITE_CONFIG_BYTE);
 
