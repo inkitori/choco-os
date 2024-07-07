@@ -116,12 +116,11 @@ void _start(void)
 
     // trigger_test_interrupt();
 
-    // idt_init();
+    idt_init();
 
     while (1)
     {
-        __asm__ volatile("hlt");
     }
 
-    framebuffer_put_string("Freezing", 0, 2, 0xFFFFFF, 0x272C34);
+    term_print("Hopefully you can't see this");
 }

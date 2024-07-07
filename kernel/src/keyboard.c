@@ -9,12 +9,12 @@ void keyboard_init()
 {
 	ps2_data_out(KEYBOARD_ENABLE_SCANNING);
 
-	while (1)
-	{
-		uint8_t scan_code = ps2_data_in();
+	// while (1)
+	// {
+	// 	uint8_t scan_code = ps2_data_in();
 
-		char buf[64];
-		to_string(scan_code, buf);
-		term_print(buf);
-	}
+	// 	char buf[64];
+	// 	to_string(scan_code, buf);
+	// 	term_print(buf);
+	// }
 }
