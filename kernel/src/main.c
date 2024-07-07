@@ -12,6 +12,7 @@ extern void trigger_test_interrupt(void);
 #include "term.h"
 #include "ps2.h"
 #include "keyboard.h"
+#include "pic.h"
 
 __attribute__((used, section(".requests"))) static volatile LIMINE_BASE_REVISION(2);
 
@@ -41,81 +42,7 @@ void _start(void)
     term_init();
     ps2_init_controller();
     keyboard_init();
-
-    // struct limine_memmap_entry **entries = memmap_request.response->entries;
-
-    // for (int i = 0; (uint64_t)i < memmap_request.response->entry_count; i++)
-    // {
-    //     uint64_t memory_type = entries[i]->type;
-
-    //     char baseBuf[64];
-    //     to_string(entries[i]->base, baseBuf);
-
-    //     char lengthBuf[64];
-    //     to_string(entries[i]->length, lengthBuf);
-
-    //     switch (memory_type)
-    //     {
-    //     case LIMINE_MEMMAP_USABLE:
-    //         framebuffer_put_string("[Usable RAM]", 0, 3 * i, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
-    //         break;
-
-    //     case LIMINE_MEMMAP_RESERVED:
-    //         framebuffer_put_string("[Reserved]", 0, 3 * i, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
-    //         break;
-
-    //     case LIMINE_MEMMAP_ACPI_RECLAIMABLE:
-    //         framebuffer_put_string("[ACPI Reclaimable]", 0, 3 * i, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
-    //         break;
-
-    //     case LIMINE_MEMMAP_ACPI_NVS:
-    //         framebuffer_put_string("[ACPI NVS]", 0, 3 * i, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
-    //         break;
-
-    //     case LIMINE_MEMMAP_BAD_MEMORY:
-    //         framebuffer_put_string("[Bad Memory]", 0, 3 * i, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
-    //         break;
-
-    //     case LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE:
-    //         framebuffer_put_string("[Bootloader Reclaimable]", 0, 3 * i, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
-    //         break;
-
-    //     case LIMINE_MEMMAP_KERNEL_AND_MODULES:
-    //         framebuffer_put_string("[Kernel & Modules]", 0, 3 * i, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
-    //         break;
-
-    //     case LIMINE_MEMMAP_FRAMEBUFFER:
-    //         framebuffer_put_string("[Framebuffer]", 0, 3 * i, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(baseBuf, 0, 3 * i + 1, 0xFFFFFF, 0x272C34);
-    //         framebuffer_put_string(lengthBuf, 0, 3 * i + 2, 0xFFFFFF, 0x272C34);
-    //         break;
-
-    //     default:
-    //         // Handle unknown memory types or add logging/error handling
-    //         break;
-    //     }
-    // }
-
-    // idt_init();
-
-    // framebuffer_put_string("IDT Loaded", 0, 1, 0xFFFFFF, 0x272C34);
-
-    // trigger_test_interrupt();
-
+    pic_init();
     idt_init();
 
     while (1)
