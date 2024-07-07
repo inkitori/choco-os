@@ -45,7 +45,7 @@ void print_config_byte()
 	term_print(config_byte_buf);
 }
 
-static inline void ps2_test_device_reset_response_byte(uint8_t response)
+static void ps2_test_device_reset_response_byte(uint8_t response)
 {
 	if (response == DEVICE_ACK)
 	{
@@ -63,9 +63,11 @@ static inline void ps2_test_device_reset_response_byte(uint8_t response)
 		case DEVICE_SELF_TEST_FAILED_1:
 			term_print_error("PS/2 device self test failed: First failure code");
 			hcf();
+			break;
 		case DEVICE_SELF_TEST_FAILED_2:
 			term_print_error("PS/2 device self test failed: Second failure code");
 			hcf();
+			break;
 		default:
 			term_print_error("PS/2 device self test failed: Unknown response byte");
 			char buf[64];
@@ -91,7 +93,7 @@ static inline void ps2_test_device_reset_response_byte(uint8_t response)
 	}
 }
 
-static inline void ps2_test_port_response_byte(uint8_t response)
+static void ps2_test_port_response_byte(uint8_t response)
 {
 	switch (response)
 	{
@@ -101,15 +103,19 @@ static inline void ps2_test_port_response_byte(uint8_t response)
 	case RESPONSE_PORT_TEST_CLOCK_LOW:
 		term_print_error("PS/2 port test failed: Clock line low");
 		hcf();
+		break;
 	case RESPONSE_PORT_TEST_CLOCK_HIGH:
 		term_print_error("PS/2 port test failed: Clock line high");
 		hcf();
+		break;
 	case RESPONSE_PORT_TEST_DATA_LOW:
 		term_print_error("PS/2 port test failed: Data line low");
 		hcf();
+		break;
 	case RESPONSE_PORT_TEST_DATA_HIGH:
 		term_print_error("PS/2 port test failed: Data line high");
 		hcf();
+		break;
 	default:
 		term_print_error("PS/2 port test failed: Unknown response byte");
 		hcf();
