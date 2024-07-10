@@ -2,7 +2,7 @@ INCLUDE=include
 KCC = x86_64-elf-gcc
 KLD = x86_64-elf-ld
 FONTS_DIR = fonts
-FONT_FILES = $(shell cd ${FONTS_DIR} && find -L * -type f -name '*.o')
+FONTS = $(addprefix $(FONTS_DIR)/, $(shell cd ${FONTS_DIR} && find -L * -type f -name '*.o'))
 
 # Nuke built-in rules and variables.
 override MAKEFLAGS += -rR
@@ -106,9 +106,9 @@ src/limine.h:
 # GNU binutils, for silly reasons, forces the ELF type to ET_EXEC even for
 # relocatable PIEs, if the base load address is non-0.
 # See https://sourceware.org/bugzilla/show_bug.cgi?id=31795 for more information.
-bin/$(KERNEL): GNUmakefile linker.ld $(OBJ)
+bin/$(KERNEL): GNUmakefile linker.ld $(OBJ) $(FONTS)
 	mkdir -p "$$(dirname $@)"
-	$(KLD) $(OBJ) $(addprefix $(FONTS_DIR)/,$(FONT_FILES)) $(KLDFLAGS)  -o $@
+	$(KLD) $(OBJ) $(FONTS) $(KLDFLAGS)  -o $@
 	printf '\003' | dd of=$@ bs=1 count=1 seek=16 conv=notrunc
 
 # Include header dependencies.
