@@ -7,6 +7,7 @@
 #include "term.h"
 #include "keyboard.h"
 #include "timer.h"
+#include "asm_wrappers.h"
 
 void isr_timer_handler()
 {
@@ -34,5 +35,5 @@ __attribute__((noreturn)) void isr_exception_handler(uint64_t exception)
 	framebuffer_put_string("Exception occurred; system halted", 0, 0, 0xFF0000, 0x000000);
 	framebuffer_put_string(buffer, 0, 1, 0xFF0000, 0x000000);
 
-	__asm__ volatile("cli; hlt"); // Completely hangs the computer
+	hcf();
 }

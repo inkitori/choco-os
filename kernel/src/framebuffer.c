@@ -4,14 +4,25 @@
 #include "asm_wrappers.h"
 #include "framebuffer.h"
 
-static inline void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color);
-
 __attribute__((used, section(".requests"))) static volatile struct limine_framebuffer_request framebuffer_request = {
 	.id = LIMINE_FRAMEBUFFER_REQUEST,
 	.revision = 0};
 
 struct limine_framebuffer *framebuffer;
 
+static inline void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color)
+{
+	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
+
+	if (x >= framebuffer->width || y >= framebuffer->height)
+	{
+		return;
+	}
+
+	size_t fb_index = y * (framebuffer->pitch / (framebuffer->bpp / 8)) + x;
+
+	fb_ptr[fb_index] = color;
+}
 void framebuffer_init()
 {
 	// Ensure we got a framebuffer.
@@ -32,20 +43,6 @@ void framebuffer_clear(uint32_t color)
 			framebuffer_draw_pixel(x, y, color);
 		}
 	}
-}
-
-static void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color)
-{
-	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
-
-	if (x >= framebuffer->width || y >= framebuffer->height)
-	{
-		return;
-	}
-
-	size_t fb_index = y * (framebuffer->pitch / (framebuffer->bpp / 8)) + x;
-
-	fb_ptr[fb_index] = color;
 }
 
 #define PSF1_FONT_MAGIC 0x0436
@@ -137,5 +134,26 @@ void framebuffer_put_string(const char *str, int cx, int cy, uint32_t fg, uint32
 		framebuffer_put_char(*str, cx, cy, fg, bg);
 		cx++;
 		str++;
+	}
+}
+
+uint64_t framebuffer_get_width()
+{
+	return framebuffer->width;
+}
+
+uint64_t framebuffer_get_height()
+{
+	return framebuffer->height;
+}
+
+void framebuffer_draw_rect(uint64_t ul_x, uint64_t ul_y, uint64_t width, uint64_t height, uint32_t color)
+{
+	for (int x = ul_x; x < ul_x + width; x++)
+	{
+		for (int y = ul_y; y < ul_y + height; y++)
+		{
+			framebuffer_draw_pixel(x, y, color);
+		}
 	}
 }

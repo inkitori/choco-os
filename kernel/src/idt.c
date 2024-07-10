@@ -8,16 +8,11 @@
 #include "ps2.h"
 #include "pic.h"
 
-#define IDT_MAX_DESCRIPTORS 256
-#define GDT_OFFSET_KERNEL_CODE 0x28
-
-static bool vectors[IDT_MAX_DESCRIPTORS];
-
 extern void *isr_stub_table[];
 
 static idtr_t idtr;
 
-__attribute__((aligned(0x10))) static idt_entry_t idt[256]; // Create an array of IDT entries; aligned for performance
+__attribute__((aligned(0x10))) static idt_entry_t idt[IDT_MAX_DESCRIPTORS]; // Create an array of IDT entries; aligned for performance
 
 void idt_set_descriptor(uint8_t vector, void *isr, uint8_t flags)
 {
@@ -37,17 +32,14 @@ void idt_init()
 	idtr.base = (uintptr_t)&idt[0];
 	idtr.limit = (uint16_t)sizeof(idt_entry_t) * IDT_MAX_DESCRIPTORS - 1;
 
-	for (uint8_t vector = 0; vector < 32; vector++)
+	for (uint8_t vector = 0; vector < IDT_EXCEPTION_COUNT; vector++)
 	{
-		idt_set_descriptor(vector, isr_stub_table[vector], 0x8E);
-		vectors[vector] = true;
+		idt_set_descriptor(vector, isr_stub_table[vector], IDT_INTERRUPT_GATE); // should this be a trap gate instead?
 	}
 
-	idt_set_descriptor(32, isr_stub_table[32], 0x8E);
-	vectors[32] = true;
-
-	idt_set_descriptor(33, isr_stub_table[33], 0x8E);
-	vectors[33] = true;
+	// TODO: write custom functions for registering IRQs
+	idt_set_descriptor(32, isr_stub_table[32], IDT_INTERRUPT_GATE); // Timer
+	idt_set_descriptor(33, isr_stub_table[33], IDT_INTERRUPT_GATE); // Keyboard
 
 	__asm__ volatile("lidt %0" : : "m"(idtr));
 	__asm__ volatile("sti");

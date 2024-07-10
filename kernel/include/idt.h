@@ -1,6 +1,12 @@
 #ifndef IDT_H
 #define IDT_H
 
+#define IDT_MAX_DESCRIPTORS 256
+#define GDT_OFFSET_KERNEL_CODE 0x28
+#define IDT_INTERRUPT_GATE 0x8E
+#define IDT_TRAP_GATE 0x8F
+#define IDT_EXCEPTION_COUNT 32
+
 #include "stdint.h"
 
 typedef struct

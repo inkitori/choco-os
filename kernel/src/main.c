@@ -42,9 +42,8 @@ void _start(void)
     pic_init();
     idt_init();
 
-    // shell_init();
-
-    snake_init();
+    shell_init();
+    // snake_init();
 
     while (1)
         ;

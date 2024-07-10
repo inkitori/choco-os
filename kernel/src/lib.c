@@ -1,4 +1,5 @@
 #include "lib.h"
+#include "term.h"
 
 void to_string(uint64_t num, char *str)
 {

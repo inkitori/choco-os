@@ -10,7 +10,8 @@
 
 void term_init();
 void term_clear(uint32_t color);
-void term_print(const char *str);
+void term_print(char *str);
+void term_print_char(char c, uint32_t font_color, uint32_t bg_color);
 void term_print_success(const char *str);
 void term_print_error(const char *str);
 
