@@ -17,6 +17,8 @@ static uint64_t apple_x = 1;
 static uint64_t apple_y = 1;
 
 static bool just_ate_apple = false;
+static bool kill_sig = false;
+
 uint64_t tail_x;
 uint64_t tail_y;
 
@@ -37,14 +39,19 @@ static void snake_update()
 		snake[snake_idx].coordinates_y = snake[snake_idx - 1].coordinates_y;
 	}
 
-	uint8_t scan_code = keyboard_get_scan_code();
-	if (scan_code == KEYBOARD_SCAN_CODE_A)
+	Key key = keyboard_get_key();
+	if (key == ESCAPE)
+	{
+		kill_sig = true;
+		return;
+	}
+	if (key == A)
 		direction = LEFT;
-	else if (scan_code == KEYBOARD_SCAN_CODE_D)
+	else if (key == D)
 		direction = RIGHT;
-	else if (scan_code == KEYBOARD_SCAN_CODE_W)
+	else if (key == W)
 		direction = UP;
-	else if (scan_code == KEYBOARD_SCAN_CODE_S)
+	else if (key == S)
 		direction = DOWN;
 
 	if (direction == LEFT)
@@ -80,8 +87,21 @@ static void snake_render()
 	framebuffer_draw_rect(apple_x * GRID_SIZE + 5, apple_y * GRID_SIZE + 5, GRID_SIZE - 10, GRID_SIZE - 10, 0xFF0000);
 }
 
+static void snake_reset()
+{
+	direction = DOWN;
+	snake_size = 1;
+	kill_sig = false;
+	just_ate_apple = false;
+
+	apple_x = 1;
+	apple_y = 1;
+}
+
 void snake_init()
 {
+	snake_reset();
+
 	snake[0].coordinates_x = 0;
 	snake[0].coordinates_y = 0;
 
@@ -91,6 +111,8 @@ void snake_init()
 
 	while (1)
 	{
+		if (kill_sig)
+			return;
 		if (timer_get_ticks() - start_time >= 10)
 		{
 			start_time = timer_get_ticks();

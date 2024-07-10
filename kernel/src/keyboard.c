@@ -8,70 +8,76 @@
 #include "stdbool.h"
 
 static uint8_t scan_code = 0;
-static char key_buffer[KEYBOARD_BUFFER_SIZE];
+static Key key_buffer[KEYBOARD_BUFFER_SIZE];
 static uint8_t read_pointer = 0;
 static uint8_t write_pointer = 0;
 
 static bool release_state = false;
 
-static inline char keyboard_convert_scan_code(uint8_t scan_code)
+static inline Key keyboard_convert_scan_code(uint8_t scan_code)
 {
 	switch (scan_code)
 	{
 	case KEYBOARD_SCAN_CODE_A:
-		return 'a';
+		return A;
 	case KEYBOARD_SCAN_CODE_B:
-		return 'b';
+		return B;
 	case KEYBOARD_SCAN_CODE_C:
-		return 'c';
+		return C;
 	case KEYBOARD_SCAN_CODE_D:
-		return 'd';
+		return D;
 	case KEYBOARD_SCAN_CODE_E:
-		return 'e';
+		return E;
 	case KEYBOARD_SCAN_CODE_F:
-		return 'f';
+		return F;
 	case KEYBOARD_SCAN_CODE_G:
-		return 'g';
+		return G;
 	case KEYBOARD_SCAN_CODE_H:
-		return 'h';
+		return H;
 	case KEYBOARD_SCAN_CODE_I:
-		return 'i';
+		return I;
 	case KEYBOARD_SCAN_CODE_J:
-		return 'j';
+		return J;
 	case KEYBOARD_SCAN_CODE_K:
-		return 'k';
+		return K;
 	case KEYBOARD_SCAN_CODE_L:
-		return 'l';
+		return L;
 	case KEYBOARD_SCAN_CODE_M:
-		return 'm';
+		return M;
 	case KEYBOARD_SCAN_CODE_N:
-		return 'n';
+		return N;
 	case KEYBOARD_SCAN_CODE_O:
-		return 'o';
+		return O;
 	case KEYBOARD_SCAN_CODE_P:
-		return 'p';
+		return P;
 	case KEYBOARD_SCAN_CODE_Q:
-		return 'q';
+		return Q;
 	case KEYBOARD_SCAN_CODE_R:
-		return 'r';
+		return R;
 	case KEYBOARD_SCAN_CODE_S:
-		return 's';
+		return S;
 	case KEYBOARD_SCAN_CODE_T:
-		return 't';
+		return T;
 	case KEYBOARD_SCAN_CODE_U:
-		return 'u';
+		return U;
 	case KEYBOARD_SCAN_CODE_V:
-		return 'v';
+		return V;
 	case KEYBOARD_SCAN_CODE_W:
-		return 'w';
+		return W;
 	case KEYBOARD_SCAN_CODE_X:
-		return 'x';
+		return X;
 	case KEYBOARD_SCAN_CODE_Y:
-		return 'y';
+		return Y;
 	case KEYBOARD_SCAN_CODE_Z:
-		return 'z';
+		return Z;
+	case KEYBOARD_SCAN_CODE_ENTER:
+		return ENTER;
+	case KEYBOARD_SCAN_CODE_SPACE:
+		return SPACE;
+	case KEYBOARD_SCAN_CODE_ESCAPE:
+		return ESCAPE;
 	default:
-		return 0;
+		return NONE;
 	}
 }
 
@@ -108,27 +114,89 @@ void keyboard_handler()
 		return;
 	}
 
-	char c = keyboard_convert_scan_code(scan_code);
-	if (c == 0)
+	Key key = keyboard_convert_scan_code(scan_code);
+	if (key == NONE)
 		return;
 
-	key_buffer[write_pointer] = c;
+	key_buffer[write_pointer] = key;
 	write_pointer = (write_pointer + 1) % KEYBOARD_BUFFER_SIZE;
 }
 
 uint8_t keyboard_get_scan_code()
 {
-
 	return scan_code;
 }
 
-char keyboard_getch()
+Key keyboard_get_key()
 {
+	if ((read_pointer + 1) % KEYBOARD_BUFFER_SIZE == (write_pointer + 1) % KEYBOARD_BUFFER_SIZE)
+		return NONE;
+
 	char retVal = key_buffer[read_pointer];
-	if (retVal == 0)
-		return 0;
-	key_buffer[read_pointer] = 0;
 	read_pointer = (read_pointer + 1) % KEYBOARD_BUFFER_SIZE;
 
 	return retVal;
+}
+
+char keyboard_key_to_char(Key key)
+{
+	switch (key)
+	{
+	case A:
+		return 'a';
+	case B:
+		return 'b';
+	case C:
+		return 'c';
+	case D:
+		return 'd';
+	case E:
+		return 'e';
+	case F:
+		return 'f';
+	case G:
+		return 'g';
+	case H:
+		return 'h';
+	case I:
+		return 'i';
+	case J:
+		return 'j';
+	case K:
+		return 'k';
+	case L:
+		return 'l';
+	case M:
+		return 'm';
+	case N:
+		return 'n';
+	case O:
+		return 'o';
+	case P:
+		return 'p';
+	case Q:
+		return 'q';
+	case R:
+		return 'r';
+	case S:
+		return 's';
+	case T:
+		return 't';
+	case U:
+		return 'u';
+	case V:
+		return 'v';
+	case W:
+		return 'w';
+	case X:
+		return 'x';
+	case Y:
+		return 'y';
+	case Z:
+		return 'z';
+	case SPACE:
+		return ' ';
+	default:
+		return '\0';
+	}
 }

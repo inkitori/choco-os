@@ -1,5 +1,6 @@
 #include "lib.h"
 #include "term.h"
+#include "stdbool.h"
 
 void to_string(uint64_t num, char *str)
 {
@@ -21,4 +22,17 @@ void to_string(uint64_t num, char *str)
 		j++;
 		i--;
 	}
+}
+
+bool cmp_string(char *a, char *b)
+{
+	uint8_t index = 0;
+	while (a[index] != '\0' || b[index] != '\0')
+	{
+		if (a[index] != b[index])
+			return false;
+		index++;
+	}
+
+	return true;
 }

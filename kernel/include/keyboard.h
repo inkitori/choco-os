@@ -36,16 +36,52 @@
 #define KEYBOARD_SCAN_CODE_Y 0x35
 #define KEYBOARD_SCAN_CODE_Z 0x1A
 
-#define KEYBOARD_SCAN_CODE_S 0x1B
-#define KEYBOARD_SCAN_CODE_D 0x23
-#define KEYBOARD_SCAN_CODE_W 0x1D
+#define KEYBOARD_SCAN_CODE_ENTER 0x5A
+#define KEYBOARD_SCAN_CODE_SPACE 0x29
+#define KEYBOARD_SCAN_CODE_ESCAPE 0x76
+
 #define KEYBOARD_SCAN_CODE_RELEASE 0xF0
 
 #define KEYBOARD_BUFFER_SIZE 64
 
+typedef enum Key
+{
+	A,
+	B,
+	C,
+	D,
+	E,
+	F,
+	G,
+	H,
+	I,
+	J,
+	K,
+	L,
+	M,
+	N,
+	O,
+	P,
+	Q,
+	R,
+	S,
+	T,
+	U,
+	V,
+	W,
+	X,
+	Y,
+	Z,
+	ENTER,
+	SPACE,
+	ESCAPE,
+	NONE
+} Key;
+
 void keyboard_init();
 void keyboard_handler();
 uint8_t keyboard_get_scan_code();
-char keyboard_getch();
+Key keyboard_get_key();
+char keyboard_key_to_char();
 
 #endif

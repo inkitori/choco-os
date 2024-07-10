@@ -24,8 +24,6 @@ void term_print(char *str)
 		term_print_char(*str, TERM_COLOR_WHITE, TERM_COLOR_BLACK);
 		str++;
 	}
-
-	row++;
 }
 
 void term_print_char(char c, uint32_t font_color, uint32_t bg_color)
