@@ -1,0 +1,6 @@
+{
+	"files.associations": {
+		"asm_utils.h": "c",
+		"io.h": "c"
+	}
+}

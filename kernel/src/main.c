@@ -3,9 +3,8 @@
 #include <stdbool.h>
 #include <limine.h>
 
-#include "framebuffer.h"
-#include "asm_wrappers.h"
 #include "idt.h"
+#include "framebuffer.h"
 #include "lib.h"
 #include "term.h"
 #include "ps2.h"
@@ -13,6 +12,7 @@
 #include "pic.h"
 #include "shell.h"
 #include "snake.h"
+#include "asm_utils.h"
 
 __attribute__((used, section(".requests"))) static volatile LIMINE_BASE_REVISION(2);
 
@@ -39,8 +39,6 @@ void _start(void)
     idt_init();
 
     shell_init();
-    // snake_init();
 
-    while (1)
-        ;
+    spinlock();
 }

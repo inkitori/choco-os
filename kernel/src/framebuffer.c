@@ -1,8 +1,8 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "asm_wrappers.h"
 #include "framebuffer.h"
+#include "asm_utils.h"
 
 __attribute__((used, section(".requests"))) static volatile struct limine_framebuffer_request framebuffer_request = {
 	.id = LIMINE_FRAMEBUFFER_REQUEST,
