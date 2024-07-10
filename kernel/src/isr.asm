@@ -24,6 +24,9 @@ isr_keyboard:
     popaq
     iretq
 
+isr_default:
+    iretq
+
 %macro isr_err_stub 1
 isr_stub_%+%1:
 	mov rdi, %+%1

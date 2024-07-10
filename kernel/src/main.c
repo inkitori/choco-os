@@ -20,10 +20,6 @@ __attribute__((used, section(".requests_start_marker"))) static volatile LIMINE_
 
 __attribute__((used, section(".requests_end_marker"))) static volatile LIMINE_REQUESTS_END_MARKER;
 
-__attribute__((used, section(".requests"))) static volatile struct limine_memmap_request memmap_request = {
-    .id = LIMINE_MEMMAP_REQUEST,
-    .revision = 0};
-
 __attribute__((used, section(".requests"))) static volatile struct limine_kernel_address_request kernel_address_request = {
     .id = LIMINE_KERNEL_ADDRESS_REQUEST,
     .revision = 0};

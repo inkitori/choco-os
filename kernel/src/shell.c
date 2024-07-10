@@ -3,6 +3,7 @@
 #include "keyboard.h"
 #include "lib.h"
 #include "snake.h"
+#include "mem.h"
 
 #include "stdint.h"
 
@@ -39,6 +40,12 @@ static void handle_clear()
 	shell_clear();
 }
 
+static void handle_memmap()
+{
+	debug_memmap();
+	term_print(">");
+}
+
 static void process_command(char *command)
 {
 	if (cmp_string(command, "ping"))
@@ -59,6 +66,11 @@ static void process_command(char *command)
 	if (cmp_string(command, "fetch"))
 	{
 		handle_fetch();
+		return;
+	}
+	if (cmp_string(command, "memmap"))
+	{
+		handle_memmap();
 		return;
 	}
 	term_print(">");
