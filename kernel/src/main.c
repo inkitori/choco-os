@@ -1,5 +1,3 @@
-extern void trigger_test_interrupt(void);
-
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
@@ -14,6 +12,7 @@ extern void trigger_test_interrupt(void);
 #include "keyboard.h"
 #include "pic.h"
 #include "shell.h"
+#include "snake.h"
 
 __attribute__((used, section(".requests"))) static volatile LIMINE_BASE_REVISION(2);
 
@@ -29,9 +28,6 @@ __attribute__((used, section(".requests"))) static volatile struct limine_kernel
     .id = LIMINE_KERNEL_ADDRESS_REQUEST,
     .revision = 0};
 
-// The following will be our kernel's entry point.
-// If renaming _start() to something else, make sure to change the
-// linker script accordingly.
 void _start(void)
 {
     // Ensure the bootloader actually understands our base revision (see spec).
@@ -46,11 +42,10 @@ void _start(void)
     pic_init();
     idt_init();
 
-    // trigger_test_interrupt();
-    shell_init();
+    // shell_init();
+
+    snake_init();
 
     while (1)
         ;
-
-    term_print("Hopefully you can't see this");
 }

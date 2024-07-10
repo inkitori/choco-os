@@ -12,6 +12,7 @@ extern isr_timer_handler
 
 isr_timer:
     pushaq
+    cld
     call isr_timer_handler
     popaq
     iretq

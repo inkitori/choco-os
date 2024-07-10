@@ -4,6 +4,7 @@
 static uint8_t line = 0;
 
 void term_init()
+
 {
 	framebuffer_init();
 	term_clear(0x00000000);

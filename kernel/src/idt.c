@@ -52,5 +52,5 @@ void idt_init()
 	__asm__ volatile("lidt %0" : : "m"(idtr));
 	__asm__ volatile("sti");
 
-	term_print("IDT initialized");
+	term_print_success("IDT initialized");
 }

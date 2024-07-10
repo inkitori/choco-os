@@ -8,13 +8,11 @@ void pic_init()
 {
 	pic_remap(PIC_MASTER_OFFSET, PIC_SLAVE_OFFSET);
 
-	// pic_unmask_irq(PIC_TIMER_IRQ_LINE); // timer
-	// FIXME: FOR WHATEVER REASON WHEN THE TIMER IRQ WAS UNMASKED THERE WOULD BE A PAGE FAULT WHEN ACCESSING THE FRAMEBUFFER???
-	// LOOK INTO THIS LATER
+	pic_unmask_irq(PIC_TIMER_IRQ_LINE); // timer
 
 	pic_unmask_irq(PIC_KEYBOARD_IRQ_LINE); // keyboard
 
-	term_print("PIC initialized");
+	term_print_success("PIC initialized");
 }
 
 static inline void pic_out(uint16_t port, uint8_t val)

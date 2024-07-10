@@ -6,10 +6,13 @@
 #include "lib.h"
 #include "term.h"
 #include "keyboard.h"
+#include "timer.h"
 
 void isr_timer_handler()
 {
 	// term_print("Timer interrupt");
+
+	timer_handler();
 
 	pic_send_eoi(PIC_TIMER_IRQ_LINE);
 }

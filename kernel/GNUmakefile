@@ -1,3 +1,4 @@
+INCLUDE=include
 # Nuke built-in rules and variables.
 override MAKEFLAGS += -rR
 
@@ -111,12 +112,12 @@ bin/$(KERNEL): GNUmakefile linker.ld $(OBJ)
 # Compilation rules for *.c files.
 obj/%.c.o: src/%.c GNUmakefile src/limine.h
 	mkdir -p "$$(dirname $@)"
-	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@ -I $(INCLUDE)
 
 # Compilation rules for *.S files.
 obj/%.S.o: src/%.S GNUmakefile
 	mkdir -p "$$(dirname $@)"
-	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@
+	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@ 
 
 # Compilation rules for *.asm (nasm) files.
 obj/%.asm.o: src/%.asm GNUmakefile

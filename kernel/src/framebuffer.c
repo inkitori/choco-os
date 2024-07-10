@@ -34,7 +34,6 @@ void framebuffer_clear(uint32_t color)
 	}
 }
 
-// FIXME: FIX THIS
 static void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color)
 {
 	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
