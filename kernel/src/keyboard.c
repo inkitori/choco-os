@@ -129,7 +129,7 @@ uint8_t keyboard_get_scan_code()
 
 Key keyboard_get_key()
 {
-	if ((read_pointer + 1) % KEYBOARD_BUFFER_SIZE == (write_pointer + 1) % KEYBOARD_BUFFER_SIZE)
+	if (read_pointer == write_pointer)
 		return NONE;
 
 	char retVal = key_buffer[read_pointer];

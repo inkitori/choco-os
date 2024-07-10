@@ -3,6 +3,7 @@
 Choco OS is a 64-bit operating system for playing retro games! Currently supports timer/keyboard interrupts, as well as its own shell prompt and some games (one).
 
 #### Future Plans
+
 - Heap memory
 - Double buffering
 - Multithreading ???
@@ -11,9 +12,9 @@ Choco OS is a 64-bit operating system for playing retro games! Currently support
 
 
 ## How to run
-On Mac, simply install the `x86_64-elf-gcc` through Homebrew and in the root directory, run `gmake run`.
+Mac: Install the `x86_64-elf-gcc` package through Homebrew and in the root directory, run `gmake run`.
 
-Windows/Linux: The GNUmakefile under /kernel will have to be modified with the appropriate compiler
+Windows/Linux: The GNUmakefile under /kernel will have to be modified with the appropriate linker and compiler
 
 ## Screenshots
 ![Shell Prompt](https://github.com/inkitori/choco-os/assets/52297896/e334bb77-5e23-45cb-9864-fb299064e27c "Shell Prompt")
