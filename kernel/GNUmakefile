@@ -98,7 +98,7 @@ override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 .PHONY: all
 all: bin/$(KERNEL)
 
-src/limine.h:
+$(INCLUDE)/limine.h:
 	curl -Lo $@ https://github.com/limine-bootloader/limine/raw/trunk/limine.h
 
 # Link rules for the final kernel executable.
@@ -115,7 +115,7 @@ bin/$(KERNEL): GNUmakefile linker.ld $(OBJ) $(FONTS)
 -include $(HEADER_DEPS)
 
 # Compilation rules for *.c files.
-obj/%.c.o: src/%.c GNUmakefile src/limine.h
+obj/%.c.o: src/%.c GNUmakefile $(INCLUDE)/limine.h
 	mkdir -p "$$(dirname $@)"
 	$(KCC) $(KCFLAGS) $(KCPPFLAGS) -c $< -o $@ -I $(INCLUDE)
 
@@ -136,4 +136,4 @@ clean:
 
 .PHONY: distclean
 distclean: clean
-	rm -f src/limine.h
+	rm -f $(INCLUDE)/limine.h
