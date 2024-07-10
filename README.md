@@ -3,7 +3,7 @@
 Choco OS is a 64-bit operating system for playing retro games! Currently supports timer/keyboard interrupts, as well as its own shell prompt and some games (one).
 
 #### Future Plans
-- Implement dynamic memory allocation
+- Heap memory
 - Double buffering
 - Multithreading ???
 - Add more games! (pong)
