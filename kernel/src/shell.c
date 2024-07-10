@@ -12,6 +12,16 @@ static void shell_clear()
 	term_print(">");
 }
 
+static void handle_fetch()
+{
+	term_print(" /\\_/\\\n");
+	term_print("( o.o )\n");
+	term_print(" > ^ <\n");
+	term_print("Choco OS\n");
+	term_print("Made by ink\n");
+	term_print(">");
+}
+
 static void handle_ping()
 {
 	term_print("pong\n");
@@ -44,6 +54,11 @@ static void process_command(char *command)
 	if (cmp_string(command, "clear"))
 	{
 		handle_clear();
+		return;
+	}
+	if (cmp_string(command, "fetch"))
+	{
+		handle_fetch();
 		return;
 	}
 	term_print(">");
