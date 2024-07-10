@@ -1,4 +1,9 @@
 INCLUDE=include
+KCC = x86_64-elf-gcc
+KLD = x86_64-elf-ld
+FONTS_DIR = fonts
+FONT_FILES = $(shell cd ${FONTS_DIR} && find -L * -type f -name '*.o')
+
 # Nuke built-in rules and variables.
 override MAKEFLAGS += -rR
 
@@ -16,15 +21,15 @@ define DEFAULT_VAR =
     endif
 endef
 
-# It is suggested to use a custom built cross toolchain to build a kernel.
-# We are using the standard "cc" here, it may work by using
-# the host system's toolchain, but this is not guaranteed.
-override DEFAULT_KCC := cc
-$(eval $(call DEFAULT_VAR,KCC,$(DEFAULT_KCC)))
+# # It is suggested to use a custom built cross toolchain to build a kernel.
+# # We are using the standard "cc" here, it may work by using
+# # the host system's toolchain, but this is not guaranteed.
+# override DEFAULT_KCC := cc
+# $(eval $(call DEFAULT_VAR,KCC,$(DEFAULT_KCC)))
 
-# Same thing for "ld" (the linker).
-override DEFAULT_KLD := ld
-$(eval $(call DEFAULT_VAR,KLD,$(DEFAULT_KLD)))
+# # Same thing for "ld" (the linker).
+# override DEFAULT_KLD := ld
+# $(eval $(call DEFAULT_VAR,KLD,$(DEFAULT_KLD)))
 
 # User controllable C flags.
 override DEFAULT_KCFLAGS := -g -O2 -pipe
@@ -86,7 +91,7 @@ override KNASMFLAGS += \
 override CFILES := $(shell cd src && find -L * -type f -name '*.c')
 override ASFILES := $(shell cd src && find -L * -type f -name '*.S')
 override NASMFILES := $(shell cd src && find -L * -type f -name '*.asm')
-override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o) $(NASMFILES:.asm=.asm.o) cozette.o) # FIXME: create a separate font directory and move cozette.o there
+override OBJ := $(addprefix obj/,$(CFILES:.c=.c.o) $(ASFILES:.S=.S.o) $(NASMFILES:.asm=.asm.o)) 
 override HEADER_DEPS := $(addprefix obj/,$(CFILES:.c=.c.d) $(ASFILES:.S=.S.d))
 
 # Default target.
@@ -103,7 +108,7 @@ src/limine.h:
 # See https://sourceware.org/bugzilla/show_bug.cgi?id=31795 for more information.
 bin/$(KERNEL): GNUmakefile linker.ld $(OBJ)
 	mkdir -p "$$(dirname $@)"
-	$(KLD) $(OBJ) $(KLDFLAGS) -o $@
+	$(KLD) $(OBJ) $(addprefix $(FONTS_DIR)/,$(FONT_FILES)) $(KLDFLAGS)  -o $@
 	printf '\003' | dd of=$@ bs=1 count=1 seek=16 conv=notrunc
 
 # Include header dependencies.
