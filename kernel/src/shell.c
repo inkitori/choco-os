@@ -14,11 +14,11 @@ static void shell_clear()
 
 static void handle_fetch()
 {
-	term_print(" /\\_/\\\n");
-	term_print("( o.o )\n");
-	term_print(" > ^ <\n");
-	term_print("Choco OS\n");
-	term_print("Made by ink\n");
+	term_print_with_color(" /\\_/\\\n", 0xa103fc, TERM_COLOR_BLACK);
+	term_print_with_color("( o.o )\n", 0xa103fc, TERM_COLOR_BLACK);
+	term_print_with_color(" > ^ <\n", 0xa103fc, TERM_COLOR_BLACK);
+	term_print_with_color("Choco OS\n", 0xe80c5c, TERM_COLOR_BLACK);
+	term_print_with_color("Made by ink\n", 0xe80c5c, TERM_COLOR_BLACK);
 	term_print(">");
 }
 

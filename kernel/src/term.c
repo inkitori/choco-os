@@ -19,9 +19,14 @@ void term_clear(uint32_t color)
 
 void term_print(char *str)
 {
+	term_print_with_color(str, TERM_COLOR_WHITE, TERM_COLOR_BLACK);
+}
+
+void term_print_with_color(char *str, uint32_t font_color, uint32_t bg_color)
+{
 	while (*str != '\0')
 	{
-		term_print_char(*str, TERM_COLOR_WHITE, TERM_COLOR_BLACK);
+		term_print_char(*str, font_color, bg_color);
 		str++;
 	}
 }
