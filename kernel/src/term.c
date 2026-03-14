@@ -15,6 +15,7 @@ void term_clear(uint32_t color)
 {
 	framebuffer_clear(color);
 	row = 0;
+	col = 0;
 }
 
 void term_print(char *str)
