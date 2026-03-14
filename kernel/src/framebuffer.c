@@ -10,6 +10,30 @@ __attribute__((used, section(".requests"))) static volatile struct limine_frameb
 
 struct limine_framebuffer *framebuffer;
 
+#define MAX_FB_WIDTH 2560
+#define MAX_FB_HEIGHT 1600
+static uint32_t backbuffer[MAX_FB_WIDTH * MAX_FB_HEIGHT];
+static bool use_double_buffer = false;
+
+void framebuffer_set_double_buffer(bool enabled)
+{
+	use_double_buffer = enabled;
+}
+
+void framebuffer_swap()
+{
+	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
+	size_t pitch_pixels = framebuffer->pitch / (framebuffer->bpp / 8);
+
+	for (uint64_t y = 0; y < framebuffer->height && y < MAX_FB_HEIGHT; y++)
+	{
+		for (uint64_t x = 0; x < framebuffer->width && x < MAX_FB_WIDTH; x++)
+		{
+			fb_ptr[y * pitch_pixels + x] = backbuffer[y * MAX_FB_WIDTH + x];
+		}
+	}
+}
+
 static inline void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color)
 {
 	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
@@ -19,9 +43,15 @@ static inline void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color
 		return;
 	}
 
-	size_t fb_index = y * (framebuffer->pitch / (framebuffer->bpp / 8)) + x;
-
-	fb_ptr[fb_index] = color;
+	if (use_double_buffer && x < MAX_FB_WIDTH && y < MAX_FB_HEIGHT)
+	{
+		backbuffer[y * MAX_FB_WIDTH + x] = color;
+	}
+	else
+	{
+		size_t fb_index = y * (framebuffer->pitch / (framebuffer->bpp / 8)) + x;
+		fb_ptr[fb_index] = color;
+	}
 }
 void framebuffer_init()
 {
@@ -149,9 +179,9 @@ uint64_t framebuffer_get_height()
 
 void framebuffer_draw_rect(uint64_t ul_x, uint64_t ul_y, uint64_t width, uint64_t height, uint32_t color)
 {
-	for (int x = ul_x; x < ul_x + width; x++)
+	for (uint64_t x = ul_x; x < ul_x + width; x++)
 	{
-		for (int y = ul_y; y < ul_y + height; y++)
+		for (uint64_t y = ul_y; y < ul_y + height; y++)
 		{
 			framebuffer_draw_pixel(x, y, color);
 		}
