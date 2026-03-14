@@ -187,6 +187,18 @@ uint64_t framebuffer_get_height()
 	return framebuffer->height;
 }
 
+uint32_t framebuffer_get_font_width()
+{
+	PSF_font *font = (PSF_font *)&_binary_cozette_psf_start;
+	return font->width;
+}
+
+uint32_t framebuffer_get_font_height()
+{
+	PSF_font *font = (PSF_font *)&_binary_cozette_psf_start;
+	return font->height;
+}
+
 void framebuffer_draw_rect(uint64_t ul_x, uint64_t ul_y, uint64_t width, uint64_t height, uint32_t color)
 {
 	for (uint64_t x = ul_x; x < ul_x + width; x++)

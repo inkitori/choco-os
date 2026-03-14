@@ -11,6 +11,8 @@ void framebuffer_put_char(unsigned short int c, int cx, int cy, uint32_t fg, uin
 void framebuffer_put_string(const char *str, int cx, int cy, uint32_t fg, uint32_t bg);
 uint64_t framebuffer_get_width();
 uint64_t framebuffer_get_height();
+uint32_t framebuffer_get_font_width();
+uint32_t framebuffer_get_font_height();
 void framebuffer_draw_rect(uint64_t ul_x, uint64_t ul_y, uint64_t width, uint64_t height, uint32_t color);
 void framebuffer_swap();
 void framebuffer_set_double_buffer(bool enabled);
