@@ -12,6 +12,8 @@ static Key key_buffer[KEYBOARD_BUFFER_SIZE];
 static uint8_t read_pointer = 0;
 static uint8_t write_pointer = 0;
 
+static bool keyboard_statte[KEY_COUNT];
+
 static bool release_state = false;
 
 static inline Key keyboard_convert_scan_code(uint8_t scan_code)
@@ -76,6 +78,8 @@ static inline Key keyboard_convert_scan_code(uint8_t scan_code)
 		return SPACE;
 	case KEYBOARD_SCAN_CODE_ESCAPE:
 		return ESCAPE;
+	case KEYBOARD_SCAN_CODE_BACKSPACE:
+		return BACKSPACE;
 	default:
 		return NONE;
 	}
@@ -196,6 +200,8 @@ char keyboard_key_to_char(Key key)
 		return 'z';
 	case SPACE:
 		return ' ';
+	case BACKSPACE:
+		return '\b';
 	default:
 		return '\0';
 	}

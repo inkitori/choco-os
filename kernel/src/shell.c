@@ -101,10 +101,23 @@ void shell_init()
 			continue;
 		}
 
-		char c = keyboard_key_to_char(key);
-		buf[buf_index] = c;
-		buf_index++;
+		if (key == BACKSPACE)
+		{
+			if (buf_index > 0)
+			{
+				buf_index--;
+				term_print_char('\b', 0xFFFFFF, 0x000000);
+			}
+			continue;
+		}
 
-		term_print_char(c, 0xFFFFFF, 0x000000);
+		char c = keyboard_key_to_char(key);
+		if (c != '\0' && buf_index < sizeof(buf) - 1)
+		{
+			buf[buf_index] = c;
+			buf_index++;
+
+			term_print_char(c, 0xFFFFFF, 0x000000);
+		}
 	}
 }

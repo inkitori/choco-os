@@ -40,6 +40,16 @@ void term_print_char(char c, uint32_t font_color, uint32_t bg_color)
 		return;
 	}
 
+	if (c == '\b')
+	{
+		if (col > 0)
+		{
+			col--;
+			framebuffer_put_char(' ', col, row, font_color, bg_color);
+		}
+		return;
+	}
+
 	framebuffer_put_char(c, col, row, font_color, bg_color);
 	col++;
 }
