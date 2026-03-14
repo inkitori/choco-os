@@ -72,6 +72,7 @@ void free(void* ptr) {
 }
 
 void* calloc(size_t num, size_t size) {
+    if (num && size > SIZE_MAX / num) return NULL;
     size_t total = num * size;
     void* ptr = malloc(total);
     if (ptr != NULL) {
@@ -140,7 +141,10 @@ void test_malloc() {
     term_print("3. Testing realloc... ");
     uint8_t *p3 = realloc(p1, 256);
     ok = true;
-    if (!p3) { term_print_error("FAIL (NULL)\n"); } else {
+    if (!p3) { 
+        term_print_error("FAIL (NULL)\n");
+        free(p1);
+    } else {
         for(int i = 0; i < 128; i++) {
             if(p3[i] != (uint8_t)i) ok = false;
         }

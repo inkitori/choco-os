@@ -5,11 +5,11 @@
 #include "framebuffer.h"
 #include "lib.h"
 #include "stdbool.h"
+#include "malloc.h"
 
-// super cursed no malloc code lol
+static SnakeBody* snake = NULL;
+static uint64_t snake_capacity = 100;
 
-static SnakeBody snake[100];
-static SnakeBody prev_snake[100];
 static Direction direction = DOWN;
 static uint64_t snake_size = 1;
 
@@ -61,8 +61,12 @@ static void snake_update()
 
 	if (just_ate_apple)
 	{
-		if (snake_size < 100)
-			snake_size++;
+		if (snake_size >= snake_capacity)
+		{
+			snake_capacity *= 2;
+			snake = realloc(snake, snake_capacity * sizeof(SnakeBody));
+		}
+		snake_size++;
 		snake[snake_size - 1].coordinates_x = tail_x;
 		snake[snake_size - 1].coordinates_y = tail_y;
 
@@ -154,6 +158,12 @@ static void snake_render()
 
 void snake_init()
 {
+	if (snake == NULL)
+	{
+		snake_capacity = 100;
+		snake = malloc(snake_capacity * sizeof(SnakeBody));
+	}
+
 	rng_seed = timer_get_ticks();
 	if (rng_seed == 0) rng_seed = 12345;
 
