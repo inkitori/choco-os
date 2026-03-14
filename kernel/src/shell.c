@@ -4,6 +4,7 @@
 #include "lib.h"
 #include "snake.h"
 #include "mem.h"
+#include "malloc.h"
 
 #include "stdint.h"
 
@@ -15,11 +16,23 @@ static void shell_clear()
 
 static void handle_fetch()
 {
-	term_print_with_color(" /\\_/\\\n", 0xa103fc, TERM_COLOR_BLACK);
-	term_print_with_color("( o.o )\n", 0xa103fc, TERM_COLOR_BLACK);
-	term_print_with_color(" > ^ <\n", 0xa103fc, TERM_COLOR_BLACK);
-	term_print_with_color("Choco OS\n", 0xe80c5c, TERM_COLOR_BLACK);
-	term_print_with_color("Made by ink\n", 0xe80c5c, TERM_COLOR_BLACK);
+	uint32_t brown = 0x8b4513;
+	uint32_t key_color = 0xe80c5c;
+	uint32_t val_color = TERM_COLOR_WHITE;
+
+	term_print("\n");
+	term_print_with_color("    /\\_/\\       ", brown, TERM_COLOR_BLACK);
+	term_print_with_color("OS: ", key_color, TERM_COLOR_BLACK);
+	term_print_with_color("Choco OS\n", val_color, TERM_COLOR_BLACK);
+
+	term_print_with_color("   ( o.o )      ", brown, TERM_COLOR_BLACK);
+	term_print_with_color("Kernel: ", key_color, TERM_COLOR_BLACK);
+	term_print_with_color("Choco Kernel\n", val_color, TERM_COLOR_BLACK);
+
+	term_print_with_color("    > ^ <       ", brown, TERM_COLOR_BLACK);
+	term_print_with_color("Author: ", key_color, TERM_COLOR_BLACK);
+	term_print_with_color("ink\n\n", val_color, TERM_COLOR_BLACK);
+
 	term_print(">");
 }
 
@@ -46,8 +59,27 @@ static void handle_memmap()
 	term_print(">");
 }
 
+static void handle_help()
+{
+	term_print("Available commands:\n");
+	term_print("  help       - Print this help message\n");
+	term_print("  fetch      - Print fetch\n");
+	term_print("  ping       - Ping\n");
+	term_print("  snake      - Play Snake\n");
+	term_print("  clear      - Clear terminal\n");
+	term_print("  memmap     - Display memory map\n");
+	term_print("  testmalloc - Test memory alloc\n");
+	term_print(">");
+}
+
+
 static void process_command(char *command)
 {
+	if (cmp_string(command, "help"))
+	{
+		handle_help();
+		return;
+	}
 	if (cmp_string(command, "ping"))
 	{
 		handle_ping();
@@ -71,6 +103,12 @@ static void process_command(char *command)
 	if (cmp_string(command, "memmap"))
 	{
 		handle_memmap();
+		return;
+	}
+	if (cmp_string(command, "testmalloc"))
+	{
+		test_malloc();
+		term_print(">");
 		return;
 	}
 	term_print(">");
