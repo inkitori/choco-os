@@ -10,26 +10,36 @@ __attribute__((used, section(".requests"))) static volatile struct limine_frameb
 
 struct limine_framebuffer *framebuffer;
 
-#define MAX_FB_WIDTH 2560
-#define MAX_FB_HEIGHT 1600
-static uint32_t backbuffer[MAX_FB_WIDTH * MAX_FB_HEIGHT];
+#include "malloc.h"
+
+static uint32_t *backbuffer = NULL;
 static bool use_double_buffer = false;
+static uint64_t backbuffer_width = 0;
+static uint64_t backbuffer_height = 0;
 
 void framebuffer_set_double_buffer(bool enabled)
 {
 	use_double_buffer = enabled;
+	if (enabled && backbuffer == NULL)
+	{
+		backbuffer_width = framebuffer->width;
+		backbuffer_height = framebuffer->height;
+		backbuffer = malloc(backbuffer_width * backbuffer_height * sizeof(uint32_t));
+	}
 }
 
 void framebuffer_swap()
 {
+	if (!backbuffer) return;
+
 	volatile uint32_t *fb_ptr = (uint32_t *)framebuffer->address;
 	size_t pitch_pixels = framebuffer->pitch / (framebuffer->bpp / 8);
 
-	for (uint64_t y = 0; y < framebuffer->height && y < MAX_FB_HEIGHT; y++)
+	for (uint64_t y = 0; y < framebuffer->height && y < backbuffer_height; y++)
 	{
-		for (uint64_t x = 0; x < framebuffer->width && x < MAX_FB_WIDTH; x++)
+		for (uint64_t x = 0; x < framebuffer->width && x < backbuffer_width; x++)
 		{
-			fb_ptr[y * pitch_pixels + x] = backbuffer[y * MAX_FB_WIDTH + x];
+			fb_ptr[y * pitch_pixels + x] = backbuffer[y * backbuffer_width + x];
 		}
 	}
 }
@@ -43,9 +53,9 @@ static inline void framebuffer_draw_pixel(uint64_t x, uint64_t y, uint32_t color
 		return;
 	}
 
-	if (use_double_buffer && x < MAX_FB_WIDTH && y < MAX_FB_HEIGHT)
+	if (use_double_buffer && backbuffer != NULL && x < backbuffer_width && y < backbuffer_height)
 	{
-		backbuffer[y * MAX_FB_WIDTH + x] = color;
+		backbuffer[y * backbuffer_width + x] = color;
 	}
 	else
 	{
