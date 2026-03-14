@@ -26,6 +26,11 @@ void framebuffer_set_double_buffer(bool enabled)
 		backbuffer_height = framebuffer->height;
 		backbuffer = malloc(backbuffer_width * backbuffer_height * sizeof(uint32_t));
 	}
+	else if (!enabled && backbuffer != NULL)
+	{
+		free(backbuffer);
+		backbuffer = NULL;
+	}
 }
 
 void framebuffer_swap()
