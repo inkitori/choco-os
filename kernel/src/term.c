@@ -1,8 +1,8 @@
 #include "term.h"
 #include "framebuffer.h"
 
-static uint8_t row = 0;
-static uint8_t col = 0;
+static int row = 0;
+static int col = 0;
 
 void term_init()
 
@@ -37,6 +37,12 @@ void term_print_char(char c, uint32_t font_color, uint32_t bg_color)
 	{
 		row++;
 		col = 0;
+		int max_rows = framebuffer_get_height() / framebuffer_get_font_height();
+		if (row >= max_rows)
+		{
+			row = 0;
+			framebuffer_clear(0x000000);
+		}
 		return;
 	}
 
@@ -50,20 +56,31 @@ void term_print_char(char c, uint32_t font_color, uint32_t bg_color)
 		return;
 	}
 
+	int max_cols = framebuffer_get_width() / framebuffer_get_font_width();
+
+	if (col >= max_cols)
+	{
+		col = 0;
+		row++;
+	}
+
+	int max_rows = framebuffer_get_height() / framebuffer_get_font_height();
+	if (row >= max_rows)
+	{
+		row = 0;
+		framebuffer_clear(0x000000);
+	}
+
 	framebuffer_put_char(c, col, row, font_color, bg_color);
 	col++;
 }
 
 void term_print_success(const char *str)
 {
-	return;
-	framebuffer_put_string(str, 0, row, TERM_COLOR_GREEN, TERM_COLOR_BLACK);
-	row++;
+	term_print_with_color((char *)str, TERM_COLOR_GREEN, TERM_COLOR_BLACK);
 }
 
 void term_print_error(const char *str)
 {
-	return;
-	framebuffer_put_string(str, 0, row, TERM_COLOR_RED, TERM_COLOR_BLACK);
-	row++;
+	term_print_with_color((char *)str, TERM_COLOR_RED, TERM_COLOR_BLACK);
 }

@@ -63,12 +63,21 @@ static void snake_update()
 	{
 		if (snake_size >= snake_capacity)
 		{
-			snake_capacity *= 2;
-			snake = realloc(snake, snake_capacity * sizeof(SnakeBody));
+			uint64_t new_capacity = snake_capacity * 2;
+			SnakeBody* new_snake = realloc(snake, new_capacity * sizeof(SnakeBody));
+			if (new_snake)
+			{
+				snake_capacity = new_capacity;
+				snake = new_snake;
+			}
 		}
-		snake_size++;
-		snake[snake_size - 1].coordinates_x = tail_x;
-		snake[snake_size - 1].coordinates_y = tail_y;
+
+		if (snake_size < snake_capacity)
+		{
+			snake_size++;
+			snake[snake_size - 1].coordinates_x = tail_x;
+			snake[snake_size - 1].coordinates_y = tail_y;
+		}
 
 		just_ate_apple = false;
 	}
@@ -163,6 +172,8 @@ void snake_init()
 		snake_capacity = 100;
 		snake = malloc(snake_capacity * sizeof(SnakeBody));
 	}
+
+	if (snake == NULL) return;
 
 	rng_seed = timer_get_ticks();
 	if (rng_seed == 0) rng_seed = 12345;
