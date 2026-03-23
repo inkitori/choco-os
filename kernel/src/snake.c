@@ -192,7 +192,7 @@ void snake_init()
 			framebuffer_set_double_buffer(false);
 			return;
 		}
-		if (timer_get_ticks() - start_time >= 10)
+		if (timer_get_ticks() - start_time >= 2)
 		{
 			start_time = timer_get_ticks();
 			snake_update();

@@ -114,7 +114,6 @@ void* realloc(void* ptr, size_t size) {
 void test_malloc() {
     term_print("Starting malloc tests...\n");
 
-    // 1. Basic Allocation & Data Integrity
     term_print("1. Testing basic malloc & write... ");
     uint8_t *p1 = malloc(128);
     if (!p1) { term_print_error("FAIL\n"); return; }
@@ -126,7 +125,6 @@ void test_malloc() {
     }
     if(ok) term_print_success("PASS\n"); else term_print_error("FAIL\n");
 
-    // 2. Calloc Zeroing
     term_print("2. Testing calloc zeroing... ");
     uint8_t *p2 = calloc(10, 10); // 100 bytes
     ok = true;
@@ -137,7 +135,6 @@ void test_malloc() {
         if(ok) term_print_success("PASS\n"); else term_print_error("FAIL\n");
     }
 
-    // 3. Realloc Data Preservation
     term_print("3. Testing realloc... ");
     uint8_t *p3 = realloc(p1, 256);
     ok = true;
@@ -151,7 +148,6 @@ void test_malloc() {
         if(ok) term_print_success("PASS\n"); else term_print_error("FAIL\n");
     }
 
-    // 4. Free and Coalescing (Simple Check)
     term_print("4. Testing free and reuse... ");
     free(p2);
     free(p3); // Freeing the reallocated block

@@ -3,8 +3,11 @@
 #include "keyboard.h"
 #include "lib.h"
 #include "snake.h"
+#include "pong.h"
 #include "mem.h"
 #include "malloc.h"
+#include "pmm.h"
+#include "vmm.h"
 
 #include "stdint.h"
 
@@ -48,6 +51,12 @@ static void handle_snake()
 	shell_clear();
 }
 
+static void handle_pong()
+{
+	pong_init();
+	shell_clear();
+}
+
 static void handle_clear()
 {
 	shell_clear();
@@ -59,6 +68,89 @@ static void handle_memmap()
 	term_print(">");
 }
 
+static void handle_testpmm()
+{
+	term_print("Testing PMM...\n");
+	
+	// Test single page allocation
+	void* page1 = pmm_alloc_page();
+	if (page1) {
+		term_print_success("PASS: Single page allocated at ");
+		char buf[64];
+		to_string((uint64_t)page1, buf);
+		term_print(buf);
+		term_print("\n");
+	} else {
+		term_print_error("FAIL: Single page allocation failed\n");
+	}
+	
+	// Test multiple page allocation
+	void* page2 = pmm_alloc_pages(4);
+	if (page2) {
+		term_print_success("PASS: 4 pages allocated at ");
+		char buf[64];
+		to_string((uint64_t)page2, buf);
+		term_print(buf);
+		term_print("\n");
+	} else {
+		term_print_error("FAIL: 4 pages allocation failed\n");
+	}
+	
+	// Test free
+	if (page1) pmm_free_page(page1);
+	if (page2) pmm_free_pages(page2, 4);
+	
+	term_print_success("PMM test completed.\n");
+	term_print(">");
+}
+
+static void handle_testvmm()
+{
+	term_print("Testing VMM...\n");
+	
+	uint64_t* pml4 = vmm_get_kernel_pml4();
+	if (pml4) {
+		term_print_success("PASS: Got kernel PML4 at ");
+		char buf[64];
+		to_string((uint64_t)pml4, buf);
+		term_print(buf);
+		term_print("\n");
+	} else {
+		term_print_error("FAIL: Failed to get kernel PML4\n");
+	}
+	
+	// Test mapping
+	void* phys_page = pmm_alloc_page();
+	if (phys_page) {
+		uint64_t test_vaddr = 0x1000000000; // Arbitrary high virtual address
+		
+		vmm_map_page(pml4, test_vaddr, (uint64_t)phys_page, PTE_PRESENT | PTE_WRITABLE);
+		
+		uint64_t mapped_phys = vmm_get_phys(pml4, test_vaddr);
+		if (mapped_phys == (uint64_t)phys_page) {
+			term_print_success("PASS: Page mapping successful\n");
+			
+			// Test unmapping
+			vmm_unmap_page(pml4, test_vaddr);
+			mapped_phys = vmm_get_phys(pml4, test_vaddr);
+			if (mapped_phys == 0) {
+				term_print_success("PASS: Page unmapping successful\n");
+			} else {
+				term_print_error("FAIL: Page still mapped after unmap\n");
+			}
+		} else {
+			term_print_error("FAIL: Physical address mismatch after mapping\n");
+		}
+		
+		pmm_free_page(phys_page);
+	} else {
+		term_print_error("FAIL: Could not allocate physical page for VMM test\n");
+	}
+	
+	term_print_success("VMM test completed.\n");
+	term_print(">");
+}
+
 static void handle_help()
 {
 	term_print("Available commands:\n");
@@ -66,9 +158,12 @@ static void handle_help()
 	term_print("  fetch      - Print fetch\n");
 	term_print("  ping       - Ping\n");
 	term_print("  snake      - Play Snake\n");
+	term_print("  pong       - Play Pong\n");
 	term_print("  clear      - Clear terminal\n");
 	term_print("  memmap     - Display memory map\n");
 	term_print("  testmalloc - Test memory alloc\n");
+	term_print("  testpmm    - Test physical memory manager\n");
+	term_print("  testvmm    - Test virtual memory manager\n");
 	term_print(">");
 }
 
@@ -90,6 +185,11 @@ static void process_command(char *command)
 		handle_snake();
 		return;
 	}
+	if (cmp_string(command, "pong"))
+	{
+		handle_pong();
+		return;
+	}
 	if (cmp_string(command, "clear"))
 	{
 		handle_clear();
@@ -109,6 +209,16 @@ static void process_command(char *command)
 	{
 		test_malloc();
 		term_print(">");
+		return;
+	}
+	if (cmp_string(command, "testpmm"))
+	{
+		handle_testpmm();
+		return;
+	}
+	if (cmp_string(command, "testvmm"))
+	{
+		handle_testvmm();
 		return;
 	}
 	term_print(">");

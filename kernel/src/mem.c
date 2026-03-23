@@ -3,9 +3,7 @@
 #include "term.h"
 #include "lib.h"
 
-__attribute__((used, section(".requests"))) static volatile struct limine_memmap_request memmap_request = {
-	.id = LIMINE_MEMMAP_REQUEST,
-	.revision = 0};
+extern volatile struct limine_memmap_request memmap_request;
 
 void debug_memmap()
 {
