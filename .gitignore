@@ -5,3 +5,4 @@
 /models
 /initrd.tar
 .DS_Store
+__pycache__/

@@ -64,6 +64,15 @@ def main():
 
         run_cmd(q, "uptime")
         check("uptime", "up 0:" in q.serial())
+
+        run_cmd(q, "ifconfig", wait=6)
+        check("dhcp lease", "eth0: 10.0.2.15" in q.serial())
+
+        run_cmd(q, "ping 10.0.2.2 2", wait=6)
+        check("ping gateway", "2/2 received" in q.serial())
+
+        run_cmd(q, "nslookup example.com", wait=5)
+        check("dns resolve", "example.com ->" in q.serial())
     finally:
         q.quit()
 

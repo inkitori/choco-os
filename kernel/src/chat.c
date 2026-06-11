@@ -354,7 +354,8 @@ typedef struct
 	char prompt[INPUT_MAX];
 } BotJob;
 
-static BotJob job; // one generation at a time (llm_busy guards anyway)
+static BotJob job; // one generation at a time
+static volatile bool bot_running = false;
 
 static void bot_emit(const char *piece, void *ud)
 {
@@ -387,6 +388,7 @@ static void bot_worker(void *arg)
 
 	ch->typing = false;
 	ch->dirty = true;
+	bot_running = false;
 }
 
 static void send_message(void)
@@ -400,6 +402,18 @@ static void send_message(void)
 	strlcpy(um->text, input, MSG_TEXT_MAX);
 
 	Message *bm = push_message(ch, ch->bot, ch->bot_color);
+
+	// One bot at a time: `job` is shared with the worker thread.
+	if (bot_running)
+	{
+		strlcpy(bm->text, "(busy writing in another channel, give me a sec)",
+				MSG_TEXT_MAX);
+		input_len = 0;
+		ch->dirty = true;
+		return;
+	}
+
+	bot_running = true;
 	job.chan = ch;
 	job.msg = bm;
 	strlcpy(job.prompt, input, sizeof(job.prompt));

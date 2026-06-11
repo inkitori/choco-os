@@ -14,6 +14,14 @@ A 64-bit hobby operating system that runs a **large language model inside the ke
   ![ChocoCord](docs/chat.png)
 
 - **Preemptive multitasking** — round-robin kernel threads with per-thread FPU/SSE state, timer-driven preemption + voluntary yield via software interrupt.
+- **A network stack** — PCI enumeration, polled e1000 driver, ARP/IPv4/ICMP/UDP, a DHCP client and DNS resolver. `ifconfig`, `ping`, `nslookup`:
+
+  ```
+  choco / > ping 10.0.2.2
+  64 bytes from 10.0.2.2: icmp_seq=1 time=10 ms
+  choco / > nslookup example.com
+  example.com -> 104.20.23.154
+  ```
 - **RAM filesystem** — mounted from a ustar initrd at boot; `ls`, `cat`, `write`, `mkdir`, `rm`, `cd`, `pwd`.
 - **Kernel heap** — PMM-backed, claims up to 768 MiB, handles the multi-MB allocations the LLM needs.
 - **Real drivers** — full PS/2 scancode-set-2 keyboard (shift/caps/ctrl, arrows, history navigation), 1000 Hz PIT, CMOS RTC, COM1 serial console (everything the terminal prints is mirrored to serial).
@@ -55,7 +63,7 @@ The first build downloads the TinyStories model weights (~60 MB total) from Hugg
 
 ```sh
 gmake                                  # build template.iso
-python3 tools/smoke_test.py            # boot + 18 end-to-end checks
+python3 tools/smoke_test.py            # boot + ~20 end-to-end checks
 ```
 
 ## Screenshots
