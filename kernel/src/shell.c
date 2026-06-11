@@ -18,6 +18,7 @@
 #include "llm.h"
 #include "serial.h"
 #include "chat.h"
+#include "rtc.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -343,6 +344,27 @@ static void cmd_sleep(int argc, char **argv)
 	sleep_ms((uint64_t)atoi(argv[1]));
 }
 
+static void cmd_date(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+								   "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+	RtcTime t = rtc_read();
+	const char *mon = (t.month >= 1 && t.month <= 12) ? months[t.month - 1]
+													  : "???";
+	term_printf("%s %d %d %02d:%02d:%02d UTC\n", mon, t.day, t.year, t.hour,
+				t.minute, t.second);
+}
+
+static void cmd_history(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	for (int i = 0; i < history_count; i++)
+		term_printf("  %d  %s\n", i + 1, history[i]);
+}
+
 static void cmd_chat(int argc, char **argv)
 {
 	(void)argc;
@@ -418,7 +440,7 @@ static void cmd_llm(int argc, char **argv)
 	uint64_t t0 = timer_get_ticks();
 	term_print_with_color(prompt, TERM_COLOR_YELLOW, TERM_COLOR_BLACK);
 	int n = llm_generate(model, prompt, max_tokens, temp_centi, topp_centi,
-						 timer_get_ticks() ^ 0x9E3779B97F4A7C15ull,
+						 timer_get_ticks() ^ 0x9E3779B97F4A7C15ull, 0,
 						 llm_emit_term, NULL);
 	uint64_t dt = timer_get_ticks() - t0;
 
@@ -455,6 +477,8 @@ static const Command commands[] = {
 	{"cd", "change directory", cmd_cd},
 	{"pwd", "print working directory", cmd_pwd},
 	{"ps", "list threads", cmd_ps},
+	{"date", "read the real-time clock", cmd_date},
+	{"history", "show command history", cmd_history},
 	{"sleep", "sleep N milliseconds", cmd_sleep},
 	{"llm", "generate text with the in-kernel LLM", cmd_llm},
 	{"chat", "ChocoCord: chat with the LLM bots", cmd_chat},
@@ -533,9 +557,27 @@ void shell_init(void)
 
 	cwd = vfs_root();
 
-	term_print_with_color("\n  Welcome to ", TERM_COLOR_WHITE, TERM_COLOR_BLACK);
-	term_print_with_color("Choco OS", TERM_COLOR_MAGENTA, TERM_COLOR_BLACK);
-	term_print(" - type 'help' for commands\n\n");
+	term_clear(TERM_COLOR_BLACK);
+	term_print_with_color(
+		"\n"
+		"   ###  #   #  ###   ###  ###     ###   ###\n"
+		"  #     #   # #   # #    #   #   #   # #\n"
+		"  #     ##### #   # #    #   #   #   #  ###\n"
+		"  #     #   # #   # #    #   #   #   #     #\n"
+		"   ###  #   #  ###   ###  ###     ###   ###\n",
+		0xC08552, TERM_COLOR_BLACK);
+	term_print_with_color(
+		"        threads * ramfs * in-kernel llm\n\n",
+		TERM_COLOR_GRAY, TERM_COLOR_BLACK);
+
+	VfsNode *motd = vfs_resolve("/etc/motd", NULL);
+	if (motd && !motd->is_dir)
+	{
+		for (size_t i = 0; i < motd->size; i++)
+			term_print_char((char)motd->data[i], TERM_COLOR_WHITE,
+							TERM_COLOR_BLACK);
+		term_print("\n");
+	}
 
 	prompt();
 

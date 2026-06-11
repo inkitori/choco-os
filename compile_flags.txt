@@ -1,0 +1,5 @@
+--target=x86_64-pc-none-elf
+-ffreestanding
+-fno-builtin
+-std=gnu11
+-Ikernel/include

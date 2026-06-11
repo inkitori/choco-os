@@ -1,4 +1,5 @@
 #include "idt.h"
+#include "kprintf.h"
 #include "io.h"
 
 #include "stdbool.h"
@@ -47,5 +48,5 @@ void idt_init()
 	__asm__ volatile("lidt %0" : : "m"(idtr));
 	__asm__ volatile("sti");
 
-	term_print_success("IDT initialized");
+	kprintf("IDT initialized\n");
 }

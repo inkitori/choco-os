@@ -1,7 +1,9 @@
-// Scrolling framebuffer terminal with a block cursor.
+// Scrolling framebuffer terminal with a block cursor. Output is mirrored
+// to the serial port so the console is scriptable from the host.
 #include "term.h"
 #include "framebuffer.h"
 #include "string.h"
+#include "serial.h"
 
 static int row = 0;
 static int col = 0;
@@ -85,6 +87,10 @@ static void newline(void)
 
 void term_print_char(char c, uint32_t font_color, uint32_t bg_color)
 {
+	if (c == '\n')
+		serial_putchar('\r');
+	serial_putchar(c);
+
 	if (cursor_drawn)
 		draw_cursor(false);
 

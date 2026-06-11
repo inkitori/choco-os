@@ -1,4 +1,5 @@
 #include "pic.h"
+#include "kprintf.h"
 
 #include "stdint.h"
 #include "io.h"
@@ -12,7 +13,7 @@ void pic_init()
 
 	pic_unmask_irq(PIC_KEYBOARD_IRQ_LINE); // keyboard
 
-	term_print_success("PIC initialized");
+	kprintf("PIC initialized\n");
 }
 
 static inline void pic_out(uint16_t port, uint8_t val)

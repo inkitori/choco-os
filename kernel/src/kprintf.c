@@ -190,6 +190,5 @@ void term_printf(const char *fmt, ...)
 	va_start(ap, fmt);
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
-	serial_write(buf);
-	term_print(buf);
+	term_print(buf); // term mirrors to serial already
 }

@@ -1,4 +1,5 @@
 #include "vmm.h"
+#include "kprintf.h"
 #include "pmm.h"
 #include "limine.h"
 #include "term.h"
@@ -16,7 +17,7 @@ static inline void invlpg(uint64_t m) {
 
 void vmm_init(void) {
     if (hhdm_request.response == NULL) {
-        term_print_error("VMM: No HHDM response from bootloader.\n");
+        kprintf("VMM: No HHDM response from bootloader.\n");
         return;
     }
     vmm_hhdm_offset = hhdm_request.response->offset;
@@ -28,7 +29,7 @@ void vmm_init(void) {
     // Physical address of PML4 is cr3 without the lower 12 bits
     kernel_pml4 = (uint64_t*)((cr3 & PTE_ADDR_MASK) + vmm_hhdm_offset);
 
-    term_print_success("VMM initialized.\n");
+    kprintf("VMM initialized.\n");
 }
 
 uint64_t* vmm_get_kernel_pml4(void) {

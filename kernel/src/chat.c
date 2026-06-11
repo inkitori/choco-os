@@ -375,7 +375,7 @@ static void bot_worker(void *arg)
 
 	int n = llm_generate(ch->model, j->prompt, ch->max_tokens, ch->temp_centi,
 						 ch->topp_centi,
-						 timer_get_ticks() ^ 0xC0FFEE5EEDull, bot_emit, j);
+						 timer_get_ticks() ^ 0xC0FFEE5EEDull, 1, bot_emit, j);
 	if (n < 0)
 		strlcpy(j->msg->text,
 				n == LLM_ERR_BUSY

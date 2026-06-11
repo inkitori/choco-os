@@ -11,9 +11,10 @@ typedef void (*llm_emit_fn)(const char *piece, void *ud);
 // Returns number of tokens generated, or a negative error code.
 // model: "stories15M" or "stories260K".
 // max_tokens: 0 means the model's full context length.
+// echo_prompt: also emit the prompt tokens during prefill.
 int llm_generate(const char *model, const char *prompt, int max_tokens,
 				 int temp_centi, int topp_centi, unsigned long seed,
-				 llm_emit_fn emit, void *ud);
+				 int echo_prompt, llm_emit_fn emit, void *ud);
 
 // Human-readable info about a model ("dim=288 layers=6 ..."), or NULL if
 // the model/module is unavailable.

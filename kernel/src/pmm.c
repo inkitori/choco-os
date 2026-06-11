@@ -1,4 +1,5 @@
 #include "pmm.h"
+#include "kprintf.h"
 #include "limine.h"
 #include "term.h"
 #include <stdbool.h>
@@ -26,11 +27,11 @@ static inline bool bitmap_test(size_t bit) {
 
 void pmm_init(void) {
     if (memmap_request.response == NULL) {
-        term_print_error("PMM: No memmap response from bootloader.\n");
+        kprintf("PMM: No memmap response from bootloader.\n");
         return;
     }
     if (hhdm_request.response == NULL) {
-        term_print_error("PMM: No HHDM response from bootloader.\n");
+        kprintf("PMM: No HHDM response from bootloader.\n");
         return;
     }
 
@@ -68,7 +69,7 @@ void pmm_init(void) {
     }
 
     if (pmm_bitmap == NULL) {
-        term_print_error("PMM: Could not find suitable region for bitmap.\n");
+        kprintf("PMM: Could not find suitable region for bitmap.\n");
         return;
     }
 
@@ -96,7 +97,7 @@ void pmm_init(void) {
     // Mark page 0 as used just in case
     bitmap_set(0);
 
-    term_print_success("PMM initialized.\n");
+    kprintf("PMM initialized.\n");
 }
 
 void* pmm_alloc_page(void) {

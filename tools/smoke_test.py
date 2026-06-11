@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Smoke tests for choco-os: boots the ISO and asserts on serial output."""
+import sys
+import time
+
+from qemu_driver import Qemu
+
+CHECKS = []
+
+
+def check(name, ok):
+    CHECKS.append((name, ok))
+    print(f"{'PASS' if ok else 'FAIL'}: {name}")
+
+
+def run_cmd(q, text, wait=1.0):
+    q.type(text)
+    q.key("ret")
+    time.sleep(wait)
+
+
+def main():
+    q = Qemu()
+    try:
+        time.sleep(14)
+        boot = q.serial()
+        check("boots to shell", "choco" in boot)
+        check("heap initialized", "heap:" in boot and "MiB" in boot)
+        check("initrd loaded", "initrd: loaded" in boot)
+        check("models registered", "stories15M.bin" in boot)
+        check("timer at 1000 Hz", "PIT at 1000 Hz" in boot)
+
+        run_cmd(q, "ping")
+        check("ping -> pong", "pong" in q.serial())
+
+        run_cmd(q, "echo Shift+Symbols OK: @#$%")
+        check("echo with symbols", "Shift+Symbols OK: @#$%" in q.serial())
+
+        run_cmd(q, "ls /")
+        check("ls shows models dir", "models" in q.serial())
+
+        run_cmd(q, "cat /etc/motd")
+        check("cat motd", "Welcome to Choco OS" in q.serial())
+
+        run_cmd(q, "write /notes.txt hello ramfs")
+        run_cmd(q, "cat /notes.txt")
+        check("ramfs write+read", "hello ramfs" in q.serial())
+
+        run_cmd(q, "mkdir /tmp/a/b")
+        run_cmd(q, "ls /tmp/a")
+        check("mkdir -p", "\nb" in q.serial() or "b" in q.serial())
+
+        run_cmd(q, "testmalloc", wait=3)
+        check("64 MiB allocation", "4. 64 MiB alloc: PASS" in q.serial())
+
+        run_cmd(q, "ps")
+        s = q.serial()
+        check("scheduler threads listed", "shell" in s and "idle" in s)
+
+        run_cmd(q, "date")
+        check("rtc date", "20" in q.serial().split("date")[-1])
+
+        run_cmd(q, "llm -m stories260K -n 80 Once upon a time", wait=15)
+        s = q.serial()
+        check("llm generates", "tok/s]" in s)
+        check("llm output has words", "the" in s.split("tok/s]")[0][-400:])
+
+        run_cmd(q, "uptime")
+        check("uptime", "up 0:" in q.serial())
+    finally:
+        q.quit()
+
+    failed = [n for n, ok in CHECKS if not ok]
+    print(f"\n{len(CHECKS) - len(failed)}/{len(CHECKS)} passed")
+    if failed:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

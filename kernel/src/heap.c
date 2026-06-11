@@ -31,6 +31,21 @@ static Block *heap_head = NULL;
 static size_t total_size = 0;
 static size_t used_size = 0;
 
+// The heap is shared by threads and the scheduler ISR (zombie reaping), so
+// every list mutation runs with interrupts disabled. Single core only.
+static inline uint64_t heap_lock(void)
+{
+	uint64_t flags;
+	__asm__ volatile("pushfq; pop %0; cli" : "=r"(flags)::"memory");
+	return flags;
+}
+
+static inline void heap_unlock(uint64_t flags)
+{
+	if (flags & (1 << 9))
+		__asm__ volatile("sti");
+}
+
 void heap_init(void)
 {
 	uint64_t hhdm = hhdm_request.response->offset;
@@ -68,6 +83,7 @@ void *malloc(size_t size)
 
 	size = (size + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
 
+	uint64_t flags = heap_lock();
 	for (Block *b = heap_head; b; b = b->next)
 	{
 		if (!b->free || b->size < size)
@@ -88,8 +104,10 @@ void *malloc(size_t size)
 		}
 		b->free = false;
 		used_size += b->size + HDR_SIZE;
+		heap_unlock(flags);
 		return (uint8_t *)b + HDR_SIZE;
 	}
+	heap_unlock(flags);
 
 	kprintf("malloc: out of memory for %lu bytes\n", (uint64_t)size);
 	return NULL;
@@ -112,9 +130,11 @@ void free(void *ptr)
 	if (!ptr)
 		return;
 
+	uint64_t flags = heap_lock();
 	Block *b = (Block *)((uint8_t *)ptr - HDR_SIZE);
 	if (b->free)
 	{
+		heap_unlock(flags);
 		kprintf("free: double free at %p\n", ptr);
 		return;
 	}
@@ -124,6 +144,7 @@ void free(void *ptr)
 	coalesce_with_next(b);
 	if (b->prev && b->prev->free)
 		coalesce_with_next(b->prev);
+	heap_unlock(flags);
 }
 
 void *calloc(size_t num, size_t size)

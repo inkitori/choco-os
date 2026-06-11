@@ -784,7 +784,7 @@ const char *llm_describe(const char *model)
 
 int llm_generate(const char *model, const char *prompt, int max_tokens,
 				 int temp_centi, int topp_centi, unsigned long seed,
-				 llm_emit_fn emit, void *ud)
+				 int echo_prompt, llm_emit_fn emit, void *ud)
 {
 	if (llm_busy)
 		return LLM_ERR_BUSY;
@@ -839,11 +839,13 @@ int llm_generate(const char *model, const char *prompt, int max_tokens,
 		float *logits = forward(t, token, pos);
 
 		int next;
+		bool sampled = false;
 		if (pos < num_prompt_tokens - 1)
 			next = prompt_tokens[pos + 1];
 		else
 		{
 			next = sample(&sampler, logits);
+			sampled = true;
 			generated++;
 		}
 		pos++;
@@ -851,9 +853,14 @@ int llm_generate(const char *model, const char *prompt, int max_tokens,
 		if (next == 1 || next == 2) // BOS/EOS ends the story
 			break;
 
-		const char *piece = decode(tok, token, next);
-		if (piece && piece[0] != '\0')
-			emit_sanitized(piece, emit, ud);
+		// During prefill the caller already knows the prompt; only emit it
+		// back when echo_prompt is set (the chat TUI wants the full story).
+		if (sampled || echo_prompt)
+		{
+			const char *piece = decode(tok, token, next);
+			if (piece && piece[0] != '\0')
+				emit_sanitized(piece, emit, ud);
+		}
 		token = next;
 
 		// stay polite: let other threads (shell, UI) run between tokens
