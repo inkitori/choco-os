@@ -122,7 +122,8 @@ int thread_create(const char *name, thread_fn fn, void *arg)
 	uint64_t *sp = (uint64_t *)top;
 
 	*--sp = GDT_KERNEL_SS;		  // SS
-	*--sp = top;				  // RSP
+	*--sp = top - 8;			  // RSP: entry alignment per SysV ABI
+								  // (rsp % 16 == 8, as after a call)
 	*--sp = 0x202;				  // RFLAGS (IF set)
 	*--sp = GDT_KERNEL_CS;		  // CS
 	*--sp = (uint64_t)trampoline; // RIP

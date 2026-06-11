@@ -114,6 +114,11 @@ bin/$(KERNEL): GNUmakefile linker.ld $(OBJ) $(FONTS)
 # Include header dependencies.
 -include $(HEADER_DEPS)
 
+# The LLM translation units run with SSE hard-float; the rest of the kernel
+# stays soft-float so interrupt handlers never touch FP state. Later flags
+# override the earlier -mno-sse etc.
+obj/llm.c.o obj/llm_math.c.o: override KCFLAGS += -m80387 -mhard-float -msse -msse2 -mfpmath=sse -O3
+
 # Compilation rules for *.c files.
 obj/%.c.o: src/%.c GNUmakefile $(INCLUDE)/limine.h
 	mkdir -p "$$(dirname $@)"

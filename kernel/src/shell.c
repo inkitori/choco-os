@@ -15,6 +15,8 @@
 #include "vfs.h"
 #include "io.h"
 #include "lib.h"
+#include "llm.h"
+#include "serial.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -340,6 +342,90 @@ static void cmd_sleep(int argc, char **argv)
 	sleep_ms((uint64_t)atoi(argv[1]));
 }
 
+static void llm_emit_term(const char *piece, void *ud)
+{
+	(void)ud;
+	term_print(piece);
+	serial_write(piece);
+}
+
+static void cmd_llm(int argc, char **argv)
+{
+	const char *model = "stories15M";
+	int max_tokens = 0;
+	int temp_centi = 80;
+	int topp_centi = 90;
+
+	char prompt[LINE_MAX];
+	prompt[0] = '\0';
+	size_t plen = 0;
+
+	int i = 1;
+	for (; i < argc; i++)
+	{
+		if (strcmp(argv[i], "-m") == 0 && i + 1 < argc)
+			model = argv[++i];
+		else if (strcmp(argv[i], "-n") == 0 && i + 1 < argc)
+			max_tokens = atoi(argv[++i]);
+		else if (strcmp(argv[i], "-t") == 0 && i + 1 < argc)
+			temp_centi = atoi(argv[++i]);
+		else if (strcmp(argv[i], "-p") == 0 && i + 1 < argc)
+			topp_centi = atoi(argv[++i]);
+		else if (strcmp(argv[i], "-i") == 0)
+		{
+			const char *info = llm_describe(model);
+			term_printf("%s: %s\n", model, info ? info : "unavailable");
+			return;
+		}
+		else
+			break;
+	}
+
+	for (; i < argc; i++)
+	{
+		if (plen && plen + 1 < sizeof(prompt))
+			prompt[plen++] = ' ';
+		size_t alen = strlen(argv[i]);
+		if (plen + alen < sizeof(prompt))
+		{
+			memcpy(prompt + plen, argv[i], alen);
+			plen += alen;
+		}
+	}
+	prompt[plen] = '\0';
+
+	if (plen == 0)
+	{
+		term_print("usage: llm [-m model] [-n tokens] [-t temp%] [-p topp%] <prompt>\n");
+		term_print("       llm -i [-m model]    show model info\n");
+		term_print("models: stories15M (default), stories260K (fast)\n");
+		return;
+	}
+
+	uint64_t t0 = timer_get_ticks();
+	term_print_with_color(prompt, TERM_COLOR_YELLOW, TERM_COLOR_BLACK);
+	int n = llm_generate(model, prompt, max_tokens, temp_centi, topp_centi,
+						 timer_get_ticks() ^ 0x9E3779B97F4A7C15ull,
+						 llm_emit_term, NULL);
+	uint64_t dt = timer_get_ticks() - t0;
+
+	if (n < 0)
+	{
+		if (n == LLM_ERR_NO_MODEL)
+			term_printf("\nllm: model '%s' not found (boot with the model module)\n", model);
+		else if (n == LLM_ERR_BUSY)
+			term_print("\nllm: another generation is in progress\n");
+		else
+			term_printf("\nllm: error %d\n", n);
+		return;
+	}
+
+	uint64_t toks_per_10s = dt ? (uint64_t)n * 10000 / dt : 0;
+	term_printf("\n");
+	term_printf("[%d tokens in %lu.%lus, %lu.%lu tok/s]\n", n, dt / 1000,
+				(dt % 1000) / 100, toks_per_10s / 10, toks_per_10s % 10);
+}
+
 static const Command commands[] = {
 	{"help", "list commands", cmd_help},
 	{"fetch", "system info", cmd_fetch},
@@ -357,6 +443,7 @@ static const Command commands[] = {
 	{"pwd", "print working directory", cmd_pwd},
 	{"ps", "list threads", cmd_ps},
 	{"sleep", "sleep N milliseconds", cmd_sleep},
+	{"llm", "generate text with the in-kernel LLM", cmd_llm},
 	{"snake", "play snake", cmd_snake},
 	{"pong", "play pong", cmd_pong},
 	{"memmap", "physical memory map", cmd_memmap},
