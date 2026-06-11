@@ -38,10 +38,37 @@ limine/limine:
 kernel:
 	$(MAKE) -C kernel
 
-$(IMAGE_NAME).iso: limine/limine kernel
+# LLM model weights + tokenizers (not committed; fetched from HuggingFace).
+MODEL_FILES := models/stories15M.bin models/stories260K.bin models/tokenizer.bin models/tok512.bin
+
+.PHONY: models
+models: $(MODEL_FILES)
+
+models/stories15M.bin:
+	mkdir -p models
+	curl -Lo $@ https://huggingface.co/karpathy/tinyllamas/resolve/main/stories15M.bin
+
+models/stories260K.bin:
+	mkdir -p models
+	curl -Lo $@ https://huggingface.co/karpathy/tinyllamas/resolve/main/stories260K/stories260K.bin
+
+models/tok512.bin:
+	mkdir -p models
+	curl -Lo $@ https://huggingface.co/karpathy/tinyllamas/resolve/main/stories260K/tok512.bin
+
+models/tokenizer.bin:
+	mkdir -p models
+	curl -Lo $@ https://github.com/karpathy/llama2.c/raw/master/tokenizer.bin
+
+initrd.tar: $(shell find initrd -type f)
+	tar --format ustar -C initrd -cf $@ .
+
+$(IMAGE_NAME).iso: limine/limine kernel initrd.tar $(MODEL_FILES)
 	rm -rf iso_root
 	mkdir -p iso_root/boot
 	cp -v kernel/bin/kernel iso_root/boot/
+	cp -v initrd.tar iso_root/boot/
+	cp -v $(MODEL_FILES) iso_root/boot/
 	mkdir -p iso_root/boot/limine
 	cp -v limine.cfg limine/limine-bios.sys limine/limine-bios-cd.bin limine/limine-uefi-cd.bin iso_root/boot/limine/
 	mkdir -p iso_root/EFI/BOOT
@@ -69,7 +96,7 @@ $(IMAGE_NAME).hdd: limine/limine kernel
 
 .PHONY: clean
 clean:
-	rm -rf iso_root $(IMAGE_NAME).iso $(IMAGE_NAME).hdd
+	rm -rf iso_root $(IMAGE_NAME).iso $(IMAGE_NAME).hdd initrd.tar
 	$(MAKE) -C kernel clean
 
 .PHONY: distclean

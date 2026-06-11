@@ -1,0 +1,6 @@
+Welcome to Choco OS!
+
+This little OS has its own LLM running entirely in the kernel.
+Try:  llm Once upon a time      (generate a story)
+      chat                      (Discord-style chat TUI)
+      help                      (everything else)

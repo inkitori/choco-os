@@ -2,3 +2,6 @@
 /ovmf
 *.iso
 *.hdd
+/models
+/initrd.tar
+.DS_Store

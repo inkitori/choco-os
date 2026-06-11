@@ -1,208 +1,266 @@
+// PS/2 keyboard driver, scancode set 2 (translation disabled).
+// Builds KeyEvents (printable chars + special keys + modifiers) from the
+// raw byte stream, including E0-extended and F0-break sequences.
 #include "keyboard.h"
 #include "ps2.h"
 #include "io.h"
-#include "stdint.h"
-#include "lib.h"
-#include "term.h"
-#include "lib.h"
-#include "stdbool.h"
+#include "kprintf.h"
+#include "sched.h"
 
-static uint8_t scan_code = 0;
-static Key key_buffer[KEYBOARD_BUFFER_SIZE];
-static uint8_t read_pointer = 0;
-static uint8_t write_pointer = 0;
+#include <stdint.h>
+#include <stdbool.h>
 
-static bool keyboard_statte[KEY_COUNT];
+#define KEYBOARD_ENABLE_SCANNING 0xF4
+#define KEYBOARD_SCAN_CODE_SET 0xF0
+#define KEYBOARD_SET_SCAN_CODE_2 0x02
 
-static bool release_state = false;
+#define SC_RELEASE 0xF0
+#define SC_EXTENDED 0xE0
 
-static inline Key keyboard_convert_scan_code(uint8_t scan_code)
-{
-	switch (scan_code)
-	{
-	case KEYBOARD_SCAN_CODE_A:
-		return A;
-	case KEYBOARD_SCAN_CODE_B:
-		return B;
-	case KEYBOARD_SCAN_CODE_C:
-		return C;
-	case KEYBOARD_SCAN_CODE_D:
-		return D;
-	case KEYBOARD_SCAN_CODE_E:
-		return E;
-	case KEYBOARD_SCAN_CODE_F:
-		return F;
-	case KEYBOARD_SCAN_CODE_G:
-		return G;
-	case KEYBOARD_SCAN_CODE_H:
-		return H;
-	case KEYBOARD_SCAN_CODE_I:
-		return I;
-	case KEYBOARD_SCAN_CODE_J:
-		return J;
-	case KEYBOARD_SCAN_CODE_K:
-		return K;
-	case KEYBOARD_SCAN_CODE_L:
-		return L;
-	case KEYBOARD_SCAN_CODE_M:
-		return M;
-	case KEYBOARD_SCAN_CODE_N:
-		return N;
-	case KEYBOARD_SCAN_CODE_O:
-		return O;
-	case KEYBOARD_SCAN_CODE_P:
-		return P;
-	case KEYBOARD_SCAN_CODE_Q:
-		return Q;
-	case KEYBOARD_SCAN_CODE_R:
-		return R;
-	case KEYBOARD_SCAN_CODE_S:
-		return S;
-	case KEYBOARD_SCAN_CODE_T:
-		return T;
-	case KEYBOARD_SCAN_CODE_U:
-		return U;
-	case KEYBOARD_SCAN_CODE_V:
-		return V;
-	case KEYBOARD_SCAN_CODE_W:
-		return W;
-	case KEYBOARD_SCAN_CODE_X:
-		return X;
-	case KEYBOARD_SCAN_CODE_Y:
-		return Y;
-	case KEYBOARD_SCAN_CODE_Z:
-		return Z;
-	case KEYBOARD_SCAN_CODE_ENTER:
-		return ENTER;
-	case KEYBOARD_SCAN_CODE_SPACE:
-		return SPACE;
-	case KEYBOARD_SCAN_CODE_ESCAPE:
-		return ESCAPE;
-	case KEYBOARD_SCAN_CODE_BACKSPACE:
-		return BACKSPACE;
-	default:
-		return NONE;
-	}
-}
+#define SC_LSHIFT 0x12
+#define SC_RSHIFT 0x59
+#define SC_LCTRL 0x14
+#define SC_LALT 0x11
+#define SC_CAPSLOCK 0x58
 
-void keyboard_init()
+#define EVENT_QUEUE_SIZE 128
+
+// Scancode set 2 -> ASCII, unshifted and shifted. Index is the scancode.
+static const char sc2_ascii[0x80] = {
+	[0x0D] = '\t', [0x0E] = '`',
+	[0x15] = 'q', [0x16] = '1', [0x1A] = 'z', [0x1B] = 's', [0x1C] = 'a',
+	[0x1D] = 'w', [0x1E] = '2', [0x21] = 'c', [0x22] = 'x', [0x23] = 'd',
+	[0x24] = 'e', [0x25] = '4', [0x26] = '3', [0x29] = ' ', [0x2A] = 'v',
+	[0x2B] = 'f', [0x2C] = 't', [0x2D] = 'r', [0x2E] = '5', [0x31] = 'n',
+	[0x32] = 'b', [0x33] = 'h', [0x34] = 'g', [0x35] = 'y', [0x36] = '6',
+	[0x3A] = 'm', [0x3B] = 'j', [0x3C] = 'u', [0x3D] = '7', [0x3E] = '8',
+	[0x41] = ',', [0x42] = 'k', [0x43] = 'i', [0x44] = 'o', [0x45] = '0',
+	[0x46] = '9', [0x49] = '.', [0x4A] = '/', [0x4B] = 'l', [0x4C] = ';',
+	[0x4D] = 'p', [0x4E] = '-', [0x52] = '\'', [0x54] = '[', [0x55] = '=',
+	[0x5A] = '\n', [0x5B] = ']', [0x5D] = '\\', [0x66] = '\b',
+};
+
+static const char sc2_ascii_shift[0x80] = {
+	[0x0D] = '\t', [0x0E] = '~',
+	[0x15] = 'Q', [0x16] = '!', [0x1A] = 'Z', [0x1B] = 'S', [0x1C] = 'A',
+	[0x1D] = 'W', [0x1E] = '@', [0x21] = 'C', [0x22] = 'X', [0x23] = 'D',
+	[0x24] = 'E', [0x25] = '$', [0x26] = '#', [0x29] = ' ', [0x2A] = 'V',
+	[0x2B] = 'F', [0x2C] = 'T', [0x2D] = 'R', [0x2E] = '%', [0x31] = 'N',
+	[0x32] = 'B', [0x33] = 'H', [0x34] = 'G', [0x35] = 'Y', [0x36] = '^',
+	[0x3A] = 'M', [0x3B] = 'J', [0x3C] = 'U', [0x3D] = '&', [0x3E] = '*',
+	[0x41] = '<', [0x42] = 'K', [0x43] = 'I', [0x44] = 'O', [0x45] = ')',
+	[0x46] = '(', [0x49] = '>', [0x4A] = '?', [0x4B] = 'L', [0x4C] = ':',
+	[0x4D] = 'P', [0x4E] = '_', [0x52] = '"', [0x54] = '{', [0x55] = '+',
+	[0x5A] = '\n', [0x5B] = '}', [0x5D] = '|', [0x66] = '\b',
+};
+
+static KeyEvent event_queue[EVENT_QUEUE_SIZE];
+static volatile uint32_t eq_read = 0;
+static volatile uint32_t eq_write = 0;
+
+static bool shift_down = false;
+static bool ctrl_down = false;
+static bool alt_down = false;
+static bool caps_on = false;
+
+static bool seen_release = false;
+static bool seen_extended = false;
+
+void keyboard_init(void)
 {
 	ps2_data_out(KEYBOARD_ENABLE_SCANNING);
-	ps2_data_in(); // flush for ack
-				   // TODO: have actual wrapper function that handles checking for ack and resends
+	ps2_data_in(); // ack
 
-	ps2_data_out(KEYBOARD_SCAN_CODE_SET); // set scancode set
+	ps2_data_out(KEYBOARD_SCAN_CODE_SET);
 	ps2_data_in();
-
 	ps2_data_out(KEYBOARD_SET_SCAN_CODE_2);
 	ps2_data_in();
 
-	term_print("Keyboard initialized\n");
+	kprintf("keyboard: scancode set 2 ready\n");
 }
 
-void keyboard_handler()
+static void push_event(KeyEvent ev)
 {
-	if ((write_pointer + 1) % KEYBOARD_BUFFER_SIZE == read_pointer)
-		return;
+	uint32_t next = (eq_write + 1) % EVENT_QUEUE_SIZE;
+	if (next == eq_read)
+		return; // queue full, drop
+	event_queue[eq_write] = ev;
+	eq_write = next;
+}
 
-	scan_code = ps2_data_in();
-
-	if (scan_code == KEYBOARD_SCAN_CODE_RELEASE)
+static KeyCode extended_keycode(uint8_t sc)
+{
+	switch (sc)
 	{
-		release_state = true;
+	case 0x75: return KEY_UP;
+	case 0x72: return KEY_DOWN;
+	case 0x6B: return KEY_LEFT;
+	case 0x74: return KEY_RIGHT;
+	case 0x6C: return KEY_HOME;
+	case 0x69: return KEY_END;
+	case 0x7D: return KEY_PGUP;
+	case 0x7A: return KEY_PGDN;
+	case 0x71: return KEY_DELETE;
+	default: return KEY_NONE;
+	}
+}
+
+void keyboard_handler(void)
+{
+	uint8_t sc = inb(0x60);
+
+	if (sc == SC_EXTENDED)
+	{
+		seen_extended = true;
 		return;
 	}
-	if (release_state)
+	if (sc == SC_RELEASE)
 	{
-		release_state = false;
+		seen_release = true;
 		return;
 	}
 
-	Key key = keyboard_convert_scan_code(scan_code);
-	if (key == NONE)
+	bool ext = seen_extended;
+	bool release = seen_release;
+	seen_extended = false;
+	seen_release = false;
+
+	// Modifier tracking (E0 14 is right-ctrl, E0 11 is right-alt).
+	if (!ext && (sc == SC_LSHIFT || sc == SC_RSHIFT))
+	{
+		shift_down = !release;
+		return;
+	}
+	if (sc == SC_LCTRL)
+	{
+		ctrl_down = !release;
+		return;
+	}
+	if (sc == SC_LALT)
+	{
+		alt_down = !release;
+		return;
+	}
+	if (!ext && sc == SC_CAPSLOCK)
+	{
+		if (!release)
+			caps_on = !caps_on;
+		return;
+	}
+
+	if (release)
 		return;
 
-	key_buffer[write_pointer] = key;
-	write_pointer = (write_pointer + 1) % KEYBOARD_BUFFER_SIZE;
+	KeyEvent ev = {.code = KEY_NONE, .ch = 0, .ctrl = ctrl_down, .alt = alt_down};
+
+	if (ext)
+	{
+		ev.code = extended_keycode(sc);
+		if (ev.code == KEY_NONE)
+			return;
+		push_event(ev);
+		return;
+	}
+
+	switch (sc)
+	{
+	case 0x76: ev.code = KEY_ESCAPE; push_event(ev); return;
+	case 0x05: ev.code = KEY_F1; push_event(ev); return;
+	case 0x06: ev.code = KEY_F2; push_event(ev); return;
+	case 0x04: ev.code = KEY_F3; push_event(ev); return;
+	case 0x0C: ev.code = KEY_F4; push_event(ev); return;
+	}
+
+	if (sc >= 0x80)
+		return;
+
+	char c = shift_down ? sc2_ascii_shift[sc] : sc2_ascii[sc];
+	if (c == 0)
+		return;
+
+	if (caps_on && !shift_down && c >= 'a' && c <= 'z')
+		c = c - 'a' + 'A';
+	else if (caps_on && shift_down && c >= 'A' && c <= 'Z')
+		c = c - 'A' + 'a';
+
+	ev.code = KEY_CHAR;
+	ev.ch = c;
+	push_event(ev);
 }
 
-uint8_t keyboard_get_scan_code()
+bool kbd_poll_event(KeyEvent *ev)
 {
-	return scan_code;
+	if (eq_read == eq_write)
+		return false;
+	*ev = event_queue[eq_read];
+	eq_read = (eq_read + 1) % EVENT_QUEUE_SIZE;
+	return true;
 }
 
-Key keyboard_get_key()
+KeyEvent kbd_wait_event(void)
 {
-	if (read_pointer == write_pointer)
+	KeyEvent ev;
+	while (!kbd_poll_event(&ev))
+	{
+		if (sched_active())
+			sched_yield();
+		else
+			__asm__ volatile("hlt");
+	}
+	return ev;
+}
+
+char kbd_getchar(void)
+{
+	for (;;)
+	{
+		KeyEvent ev = kbd_wait_event();
+		if (ev.code == KEY_CHAR)
+			return ev.ch;
+	}
+}
+
+void kbd_flush(void)
+{
+	eq_read = eq_write;
+}
+
+// ---- Legacy API for the games ----
+
+Key keyboard_get_key(void)
+{
+	KeyEvent ev;
+	if (!kbd_poll_event(&ev))
 		return NONE;
 
-	char retVal = key_buffer[read_pointer];
-	read_pointer = (read_pointer + 1) % KEYBOARD_BUFFER_SIZE;
+	if (ev.code == KEY_ESCAPE)
+		return ESCAPE;
+	if (ev.code != KEY_CHAR)
+		return NONE;
 
-	return retVal;
+	char c = ev.ch;
+	if (c >= 'A' && c <= 'Z')
+		c = c - 'A' + 'a';
+	if (c >= 'a' && c <= 'z')
+		return (Key)(A + (c - 'a'));
+
+	switch (c)
+	{
+	case '\n': return ENTER;
+	case ' ': return SPACE;
+	case '\b': return BACKSPACE;
+	default: return NONE;
+	}
 }
 
 char keyboard_key_to_char(Key key)
 {
+	if (key >= A && key <= Z)
+		return 'a' + (key - A);
 	switch (key)
 	{
-	case A:
-		return 'a';
-	case B:
-		return 'b';
-	case C:
-		return 'c';
-	case D:
-		return 'd';
-	case E:
-		return 'e';
-	case F:
-		return 'f';
-	case G:
-		return 'g';
-	case H:
-		return 'h';
-	case I:
-		return 'i';
-	case J:
-		return 'j';
-	case K:
-		return 'k';
-	case L:
-		return 'l';
-	case M:
-		return 'm';
-	case N:
-		return 'n';
-	case O:
-		return 'o';
-	case P:
-		return 'p';
-	case Q:
-		return 'q';
-	case R:
-		return 'r';
-	case S:
-		return 's';
-	case T:
-		return 't';
-	case U:
-		return 'u';
-	case V:
-		return 'v';
-	case W:
-		return 'w';
-	case X:
-		return 'x';
-	case Y:
-		return 'y';
-	case Z:
-		return 'z';
-	case SPACE:
-		return ' ';
-	case BACKSPACE:
-		return '\b';
-	default:
-		return '\0';
+	case SPACE: return ' ';
+	case BACKSPACE: return '\b';
+	default: return '\0';
 	}
 }

@@ -1,67 +1,65 @@
-#include "stdint.h"
+#include <stdint.h>
 #include "framebuffer.h"
 #include "pic.h"
-#include "ps2.h"
 #include "io.h"
-#include "lib.h"
+#include "kprintf.h"
 #include "term.h"
 #include "keyboard.h"
 #include "timer.h"
+#include "sched.h"
 #include "asm_utils.h"
 
-#define DIVISION_ERROR 0
-#define DEBUG 1
-#define NON_MASKABLE_INTERRUPT 2
-#define BREAKPOINT 3
-#define OVERFLOW 4
-#define BOUND_RANGE_EXCEEDED 5
-#define INVALID_OPCODE 6
-#define DEVICE_NOT_AVAILABLE 7
-#define DOUBLE_FAULT 8
-#define COPROCESSOR_SEGMENT_OVERRUN 9
-#define INVALID_TSS 0xA
-#define SEGMENT_NOT_PRESENT 0xB
-#define STACK_SEGMENT_FAULT 0xC
-#define GENERAL_PROTECTION_FAULT 0xD
-#define PAGE_FAULT 0xE
-// 0xF Reserved
-#define x87_FLOATING_POINT_EXCEPTION 0x10
-#define ALIGNMENT_CHECK 0x11
-#define MACHINE_CHECK 0x12
-#define SIMD_FLOATING_POINT_EXCEPTION 0x13
-#define VIRTUALIZATION_EXCEPTION 0x14
-#define CONTROL_PROTECTION_EXCEPTION 0x15
-// 0x16 - 0x1B Reserved
-#define HYPERVISOR_INJECTION_EXCEPTION 0x1C
-#define VMM_COMMUNICATION_EXCEPTION 0x1D
-#define SECURITY_EXCEPTION 0x1E
-// 0x1F Reserved
-
-void isr_timer_handler()
+uint64_t isr_timer_handler(uint64_t rsp)
 {
-	// term_print("Timer interrupt");
-
 	timer_handler();
-
 	pic_send_eoi(PIC_TIMER_IRQ_LINE);
+	return sched_tick(rsp);
 }
 
-void isr_keyboard_handler()
+uint64_t isr_yield_handler(uint64_t rsp)
 {
-	// term_print("Keyboard Interrupt Raised");
-	keyboard_handler();
+	return sched_preempt(rsp);
+}
 
+void isr_keyboard_handler(void)
+{
+	keyboard_handler();
 	pic_send_eoi(PIC_KEYBOARD_IRQ_LINE);
 }
 
-__attribute__((noreturn)) void isr_exception_handler(uint64_t exceptionIRQ)
-{
-	char buffer[64];
-	to_string(exceptionIRQ, buffer);
+static const char *exception_names[32] = {
+	"Division Error", "Debug", "NMI", "Breakpoint", "Overflow",
+	"Bound Range Exceeded", "Invalid Opcode", "Device Not Available",
+	"Double Fault", "Coprocessor Segment Overrun", "Invalid TSS",
+	"Segment Not Present", "Stack-Segment Fault", "General Protection Fault",
+	"Page Fault", "Reserved", "x87 FP Exception", "Alignment Check",
+	"Machine Check", "SIMD FP Exception", "Virtualization Exception",
+	"Control Protection Exception", "Reserved", "Reserved", "Reserved",
+	"Reserved", "Reserved", "Reserved", "Hypervisor Injection",
+	"VMM Communication", "Security Exception", "Reserved"};
 
-	framebuffer_clear(0x000000);
-	framebuffer_put_string("Exception occurred; system halted", 0, 0, 0xFF0000, 0x000000);
-	framebuffer_put_string(buffer, 0, 1, 0xFF0000, 0x000000);
+__attribute__((noreturn)) void isr_exception_handler(uint64_t vector,
+													 uint64_t error_code,
+													 uint64_t rip)
+{
+	const char *name = vector < 32 ? exception_names[vector] : "Unknown";
+
+	kprintf("\n!!! EXCEPTION %lu (%s) err=%lx rip=%lx\n", vector, name,
+			error_code, rip);
+	if (vector == 14)
+	{
+		uint64_t cr2;
+		__asm__ volatile("mov %%cr2, %0" : "=r"(cr2));
+		kprintf("    page fault address: %lx\n", cr2);
+	}
+
+	char buf[128];
+	framebuffer_clear(0x300000);
+	snprintf(buf, sizeof(buf), "EXCEPTION %lu: %s", vector, name);
+	framebuffer_put_string(buf, 2, 2, 0xFFFFFF, 0x300000);
+	snprintf(buf, sizeof(buf), "error=0x%lx rip=0x%lx", error_code, rip);
+	framebuffer_put_string(buf, 2, 4, 0xFFFFFF, 0x300000);
+	framebuffer_put_string("system halted", 2, 6, 0xFF8888, 0x300000);
 
 	hcf();
 }

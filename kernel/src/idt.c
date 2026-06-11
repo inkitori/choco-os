@@ -41,6 +41,9 @@ void idt_init()
 	idt_set_descriptor(32, isr_stub_table[32], IDT_INTERRUPT_GATE); // Timer
 	idt_set_descriptor(33, isr_stub_table[33], IDT_INTERRUPT_GATE); // Keyboard
 
+	extern void isr_yield(void);
+	idt_set_descriptor(0x30, (void *)isr_yield, IDT_INTERRUPT_GATE); // sched_yield
+
 	__asm__ volatile("lidt %0" : : "m"(idtr));
 	__asm__ volatile("sti");
 

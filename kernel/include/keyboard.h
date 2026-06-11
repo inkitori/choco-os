@@ -1,78 +1,14 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
-#include "stdint.h"
 
-#define KEYBOARD_ENABLE_SCANNING 0xF4
-#define KEYBOARD_SCAN_CODE_SET 0xF0
+#include <stdint.h>
+#include <stdbool.h>
 
-#define KEYBOARD_SET_SCAN_CODE_1 0x01
-#define KEYBOARD_SET_SCAN_CODE_2 0x02
-#define KEYBOARD_SET_SCAN_CODE_3 0x03
-
-#define KEYBOARD_SCAN_CODE_A 0x1C
-#define KEYBOARD_SCAN_CODE_B 0x32
-#define KEYBOARD_SCAN_CODE_C 0x21
-#define KEYBOARD_SCAN_CODE_D 0x23
-#define KEYBOARD_SCAN_CODE_E 0x24
-#define KEYBOARD_SCAN_CODE_F 0x2B
-#define KEYBOARD_SCAN_CODE_G 0x34
-#define KEYBOARD_SCAN_CODE_H 0x33
-#define KEYBOARD_SCAN_CODE_I 0x43
-#define KEYBOARD_SCAN_CODE_J 0x3B
-#define KEYBOARD_SCAN_CODE_K 0x42
-#define KEYBOARD_SCAN_CODE_L 0x4B
-#define KEYBOARD_SCAN_CODE_M 0x3A
-#define KEYBOARD_SCAN_CODE_N 0x31
-#define KEYBOARD_SCAN_CODE_O 0x44
-#define KEYBOARD_SCAN_CODE_P 0x4D
-#define KEYBOARD_SCAN_CODE_Q 0x15
-#define KEYBOARD_SCAN_CODE_R 0x2D
-#define KEYBOARD_SCAN_CODE_S 0x1B
-#define KEYBOARD_SCAN_CODE_T 0x2C
-#define KEYBOARD_SCAN_CODE_U 0x3C
-#define KEYBOARD_SCAN_CODE_V 0x2A
-#define KEYBOARD_SCAN_CODE_W 0x1D
-#define KEYBOARD_SCAN_CODE_X 0x22
-#define KEYBOARD_SCAN_CODE_Y 0x35
-#define KEYBOARD_SCAN_CODE_Z 0x1A
-
-#define KEYBOARD_SCAN_CODE_ENTER 0x5A
-#define KEYBOARD_SCAN_CODE_SPACE 0x29
-#define KEYBOARD_SCAN_CODE_ESCAPE 0x76
-#define KEYBOARD_SCAN_CODE_BACKSPACE 0x66
-
-#define KEYBOARD_SCAN_CODE_RELEASE 0xF0
-
-#define KEYBOARD_BUFFER_SIZE 64
-
+// Legacy key enum kept for the games (snake/pong).
 typedef enum Key
 {
-	A,
-	B,
-	C,
-	D,
-	E,
-	F,
-	G,
-	H,
-	I,
-	J,
-	K,
-	L,
-	M,
-	N,
-	O,
-	P,
-	Q,
-	R,
-	S,
-	T,
-	U,
-	V,
-	W,
-	X,
-	Y,
-	Z,
+	A, B, C, D, E, F, G, H, I, J, K, L, M,
+	N, O, P, Q, R, S, T, U, V, W, X, Y, Z,
 	ENTER,
 	SPACE,
 	ESCAPE,
@@ -81,10 +17,47 @@ typedef enum Key
 	KEY_COUNT
 } Key;
 
-void keyboard_init();
-void keyboard_handler();
-uint8_t keyboard_get_scan_code();
-Key keyboard_get_key();
-char keyboard_key_to_char();
+// Special (non-ASCII) key codes delivered through kbd events.
+typedef enum
+{
+	KEY_NONE = 0,
+	KEY_CHAR,
+	KEY_UP,
+	KEY_DOWN,
+	KEY_LEFT,
+	KEY_RIGHT,
+	KEY_HOME,
+	KEY_END,
+	KEY_PGUP,
+	KEY_PGDN,
+	KEY_DELETE,
+	KEY_ESCAPE,
+	KEY_TAB,
+	KEY_F1, KEY_F2, KEY_F3, KEY_F4,
+} KeyCode;
+
+typedef struct
+{
+	KeyCode code; // KEY_CHAR for printable chars (incl \n, \b)
+	char ch;	  // valid when code == KEY_CHAR
+	bool ctrl;
+	bool alt;
+} KeyEvent;
+
+void keyboard_init(void);
+void keyboard_handler(void);
+
+// Event API: returns false if no event pending.
+bool kbd_poll_event(KeyEvent *ev);
+// Blocking: halts (or yields, once the scheduler runs) until an event arrives.
+KeyEvent kbd_wait_event(void);
+// Convenience: blocking read of next printable char/\n/\b. Arrows etc. are skipped.
+char kbd_getchar(void);
+// Drop any pending input.
+void kbd_flush(void);
+
+// Legacy API for the games.
+Key keyboard_get_key(void);
+char keyboard_key_to_char(Key key);
 
 #endif

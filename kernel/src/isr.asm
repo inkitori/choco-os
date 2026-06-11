@@ -2,18 +2,30 @@
 
 SECTION .text
 extern isr_exception_handler
-global trigger_test_interrupt
-
-trigger_test_interrupt:
-    int 0xE
 
 extern isr_keyboard_handler
 extern isr_timer_handler
+extern isr_yield_handler
 
+; Timer interrupt: the C handler receives the interrupted context's stack
+; pointer and returns the stack pointer to resume (possibly another thread's).
 isr_timer:
     pushaq
     cld
+    mov rdi, rsp
     call isr_timer_handler
+    mov rsp, rax
+    popaq
+    iretq
+
+; Voluntary yield via `int 0x30` - same frame contract as the timer.
+global isr_yield
+isr_yield:
+    pushaq
+    cld
+    mov rdi, rsp
+    call isr_yield_handler
+    mov rsp, rax
     popaq
     iretq
 
@@ -24,12 +36,11 @@ isr_keyboard:
     popaq
     iretq
 
-isr_default:
-    iretq
-
 %macro isr_err_stub 1
 isr_stub_%+%1:
 	mov rdi, %+%1
+    mov rsi, [rsp]      ; error code
+    mov rdx, [rsp+8]    ; faulting RIP
     call isr_exception_handler
     iretq
 %endmacro
@@ -37,6 +48,8 @@ isr_stub_%+%1:
 %macro isr_no_err_stub 1
 isr_stub_%+%1:
 	mov rdi, %+%1
+    xor rsi, rsi
+    mov rdx, [rsp]      ; faulting RIP
     call isr_exception_handler
     iretq
 %endmacro
@@ -79,8 +92,8 @@ global isr_stub_table
 isr_stub_table:
     %assign i 0
     %rep    32
-        dq isr_stub_%+i 
-    %assign i i+1 
+        dq isr_stub_%+i
+    %assign i i+1
     %endrep
     dq isr_timer
     dq isr_keyboard

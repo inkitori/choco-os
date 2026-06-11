@@ -1,271 +1,528 @@
+// Interactive shell: line editing, command history, argument parsing.
 #include "shell.h"
 #include "term.h"
 #include "keyboard.h"
-#include "lib.h"
+#include "string.h"
+#include "kprintf.h"
 #include "snake.h"
 #include "pong.h"
 #include "mem.h"
 #include "malloc.h"
 #include "pmm.h"
 #include "vmm.h"
+#include "timer.h"
+#include "sched.h"
+#include "vfs.h"
+#include "io.h"
+#include "lib.h"
 
-#include "stdint.h"
+#include <stdint.h>
+#include <stdbool.h>
 
-static void shell_clear()
+#define LINE_MAX 256
+#define HISTORY_MAX 16
+#define ARGV_MAX 16
+
+static char history[HISTORY_MAX][LINE_MAX];
+static int history_count = 0;
+
+static VfsNode *cwd = NULL;
+
+static void prompt(void)
 {
-	term_clear(0x000000);
-	term_print(">");
+	char path[128];
+	vfs_node_path(cwd ? cwd : vfs_root(), path, sizeof(path));
+	term_print_with_color("choco", TERM_COLOR_MAGENTA, TERM_COLOR_BLACK);
+	term_print_with_color(" ", TERM_COLOR_WHITE, TERM_COLOR_BLACK);
+	term_print_with_color(path, TERM_COLOR_CYAN, TERM_COLOR_BLACK);
+	term_print_with_color(" > ", TERM_COLOR_WHITE, TERM_COLOR_BLACK);
 }
 
-static void handle_fetch()
+// ---- commands ----
+
+typedef struct
 {
+	const char *name;
+	const char *help;
+	void (*fn)(int argc, char **argv);
+} Command;
+
+static void cmd_help(int argc, char **argv);
+
+static void cmd_fetch(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
 	uint32_t brown = 0x8b4513;
 	uint32_t key_color = 0xe80c5c;
-	uint32_t val_color = TERM_COLOR_WHITE;
+
+	uint64_t up = timer_get_ticks() / 1000;
+	char upbuf[64];
+	snprintf(upbuf, sizeof(upbuf), "%lum %lus\n", up / 60, up % 60);
+	char membuf[64];
+	snprintf(membuf, sizeof(membuf), "%lu/%lu MiB heap\n",
+			 (uint64_t)(heap_used() / (1024 * 1024)),
+			 (uint64_t)(heap_total() / (1024 * 1024)));
 
 	term_print("\n");
 	term_print_with_color("    /\\_/\\       ", brown, TERM_COLOR_BLACK);
 	term_print_with_color("OS: ", key_color, TERM_COLOR_BLACK);
-	term_print_with_color("Choco OS\n", val_color, TERM_COLOR_BLACK);
+	term_print("Choco OS x86_64\n");
 
 	term_print_with_color("   ( o.o )      ", brown, TERM_COLOR_BLACK);
 	term_print_with_color("Kernel: ", key_color, TERM_COLOR_BLACK);
-	term_print_with_color("Choco Kernel\n", val_color, TERM_COLOR_BLACK);
+	term_print("Choco Kernel (threads + ramfs + llm)\n");
 
 	term_print_with_color("    > ^ <       ", brown, TERM_COLOR_BLACK);
-	term_print_with_color("Author: ", key_color, TERM_COLOR_BLACK);
-	term_print_with_color("ink\n\n", val_color, TERM_COLOR_BLACK);
+	term_print_with_color("Uptime: ", key_color, TERM_COLOR_BLACK);
+	term_print(upbuf);
 
-	term_print(">");
+	term_print_with_color("                ", brown, TERM_COLOR_BLACK);
+	term_print_with_color("Memory: ", key_color, TERM_COLOR_BLACK);
+	term_print(membuf);
+	term_print("\n");
 }
 
-static void handle_ping()
+static void cmd_ping(int argc, char **argv)
 {
+	(void)argc;
+	(void)argv;
 	term_print("pong\n");
-	term_print(">");
 }
 
-static void handle_snake()
+static void cmd_clear(int argc, char **argv)
 {
+	(void)argc;
+	(void)argv;
+	term_clear(TERM_COLOR_BLACK);
+}
+
+static void cmd_echo(int argc, char **argv)
+{
+	for (int i = 1; i < argc; i++)
+	{
+		term_print(argv[i]);
+		if (i + 1 < argc)
+			term_print(" ");
+	}
+	term_print("\n");
+}
+
+static void cmd_uptime(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	uint64_t ms = timer_get_ticks();
+	term_printf("up %lu:%02lu:%02lu (%lu ms)\n", ms / 3600000,
+				(ms / 60000) % 60, (ms / 1000) % 60, ms);
+}
+
+static void cmd_free(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	term_printf("heap: %lu KiB used / %lu KiB total\n",
+				(uint64_t)(heap_used() / 1024),
+				(uint64_t)(heap_total() / 1024));
+}
+
+static void cmd_snake(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	term_set_cursor_visible(false);
 	snake_init();
-	shell_clear();
+	term_set_cursor_visible(true);
+	term_clear(TERM_COLOR_BLACK);
 }
 
-static void handle_pong()
+static void cmd_pong(int argc, char **argv)
 {
+	(void)argc;
+	(void)argv;
+	term_set_cursor_visible(false);
 	pong_init();
-	shell_clear();
+	term_set_cursor_visible(true);
+	term_clear(TERM_COLOR_BLACK);
 }
 
-static void handle_clear()
+static void cmd_memmap(int argc, char **argv)
 {
-	shell_clear();
-}
-
-static void handle_memmap()
-{
+	(void)argc;
+	(void)argv;
 	debug_memmap();
-	term_print(">");
 }
 
-static void handle_testpmm()
+static void cmd_testmalloc(int argc, char **argv)
 {
-	term_print("Testing PMM...\n");
-	
-	// Test single page allocation
-	void* page1 = pmm_alloc_page();
-	if (page1) {
-		term_print_success("PASS: Single page allocated at ");
-		char buf[64];
-		to_string((uint64_t)page1, buf);
-		term_print(buf);
-		term_print("\n");
-	} else {
-		term_print_error("FAIL: Single page allocation failed\n");
-	}
-	
-	// Test multiple page allocation
-	void* page2 = pmm_alloc_pages(4);
-	if (page2) {
-		term_print_success("PASS: 4 pages allocated at ");
-		char buf[64];
-		to_string((uint64_t)page2, buf);
-		term_print(buf);
-		term_print("\n");
-	} else {
-		term_print_error("FAIL: 4 pages allocation failed\n");
-	}
-	
-	// Test free
-	if (page1) pmm_free_page(page1);
-	if (page2) pmm_free_pages(page2, 4);
-	
-	term_print_success("PMM test completed.\n");
-	term_print(">");
+	(void)argc;
+	(void)argv;
+	test_malloc();
 }
 
-static void handle_testvmm()
+static void cmd_ps(int argc, char **argv)
 {
-	term_print("Testing VMM...\n");
-	
-	uint64_t* pml4 = vmm_get_kernel_pml4();
-	if (pml4) {
-		term_print_success("PASS: Got kernel PML4 at ");
-		char buf[64];
-		to_string((uint64_t)pml4, buf);
-		term_print(buf);
-		term_print("\n");
-	} else {
-		term_print_error("FAIL: Failed to get kernel PML4\n");
-	}
-	
-	// Test mapping
-	void* phys_page = pmm_alloc_page();
-	if (phys_page) {
-		uint64_t test_vaddr = 0x1000000000; // Arbitrary high virtual address
-		
-		vmm_map_page(pml4, test_vaddr, (uint64_t)phys_page, PTE_PRESENT | PTE_WRITABLE);
-		
-		uint64_t mapped_phys = vmm_get_phys(pml4, test_vaddr);
-		if (mapped_phys == (uint64_t)phys_page) {
-			term_print_success("PASS: Page mapping successful\n");
-			
-			// Test unmapping
-			vmm_unmap_page(pml4, test_vaddr);
-			mapped_phys = vmm_get_phys(pml4, test_vaddr);
-			if (mapped_phys == 0) {
-				term_print_success("PASS: Page unmapping successful\n");
-			} else {
-				term_print_error("FAIL: Page still mapped after unmap\n");
-			}
-		} else {
-			term_print_error("FAIL: Physical address mismatch after mapping\n");
-		}
-		
-		pmm_free_page(phys_page);
-	} else {
-		term_print_error("FAIL: Could not allocate physical page for VMM test\n");
-	}
-	
-	term_print_success("VMM test completed.\n");
-	term_print(">");
+	(void)argc;
+	(void)argv;
+	sched_dump();
 }
 
-static void handle_help()
+static void cmd_ls(int argc, char **argv)
 {
-	term_print("Available commands:\n");
-	term_print("  help       - Print this help message\n");
-	term_print("  fetch      - Print fetch\n");
-	term_print("  ping       - Ping\n");
-	term_print("  snake      - Play Snake\n");
-	term_print("  pong       - Play Pong\n");
-	term_print("  clear      - Clear terminal\n");
-	term_print("  memmap     - Display memory map\n");
-	term_print("  testmalloc - Test memory alloc\n");
-	term_print("  testpmm    - Test physical memory manager\n");
-	term_print("  testvmm    - Test virtual memory manager\n");
-	term_print(">");
-}
-
-
-static void process_command(char *command)
-{
-	if (cmp_string(command, "help"))
+	VfsNode *dir = cwd;
+	if (argc > 1)
 	{
-		handle_help();
-		return;
-	}
-	if (cmp_string(command, "ping"))
-	{
-		handle_ping();
-		return;
-	}
-	if (cmp_string(command, "snake"))
-	{
-		handle_snake();
-		return;
-	}
-	if (cmp_string(command, "pong"))
-	{
-		handle_pong();
-		return;
-	}
-	if (cmp_string(command, "clear"))
-	{
-		handle_clear();
-		return;
-	}
-	if (cmp_string(command, "fetch"))
-	{
-		handle_fetch();
-		return;
-	}
-	if (cmp_string(command, "memmap"))
-	{
-		handle_memmap();
-		return;
-	}
-	if (cmp_string(command, "testmalloc"))
-	{
-		test_malloc();
-		term_print(">");
-		return;
-	}
-	if (cmp_string(command, "testpmm"))
-	{
-		handle_testpmm();
-		return;
-	}
-	if (cmp_string(command, "testvmm"))
-	{
-		handle_testvmm();
-		return;
-	}
-	term_print(">");
-}
-
-void shell_init()
-{
-	char buf[128];
-	uint8_t buf_index = 0;
-
-	shell_clear();
-	while (1)
-	{
-		Key key = keyboard_get_key();
-		if (key == NONE)
+		dir = vfs_resolve(argv[1], cwd);
+		if (!dir)
 		{
+			term_printf("ls: %s: not found\n", argv[1]);
+			return;
+		}
+	}
+	if (!dir->is_dir)
+	{
+		term_printf("%s\n", dir->name);
+		return;
+	}
+	for (VfsNode *c = dir->children; c; c = c->next)
+	{
+		if (c->is_dir)
+			term_print_with_color(c->name, TERM_COLOR_CYAN, TERM_COLOR_BLACK);
+		else
+			term_print(c->name);
+		if (!c->is_dir)
+			term_printf("  (%lu)", (uint64_t)c->size);
+		term_print("\n");
+	}
+}
+
+static void cmd_cat(int argc, char **argv)
+{
+	if (argc < 2)
+	{
+		term_print("usage: cat <file>\n");
+		return;
+	}
+	VfsNode *f = vfs_resolve(argv[1], cwd);
+	if (!f || f->is_dir)
+	{
+		term_printf("cat: %s: not found\n", argv[1]);
+		return;
+	}
+	for (size_t i = 0; i < f->size; i++)
+	{
+		char c = (char)f->data[i];
+		if (c == '\t' || c == '\n' || (c >= 32 && c < 127))
+			term_print_char(c, term_get_fg(), term_get_bg());
+		else
+			term_print_char('.', TERM_COLOR_GRAY, term_get_bg());
+	}
+	if (f->size && f->data[f->size - 1] != '\n')
+		term_print("\n");
+}
+
+static void cmd_write(int argc, char **argv)
+{
+	if (argc < 3)
+	{
+		term_print("usage: write <file> <text...>\n");
+		return;
+	}
+	const char *leaf = NULL;
+	VfsNode *dir = vfs_resolve_parent(argv[1], cwd, &leaf);
+	if (!dir || !leaf)
+	{
+		term_printf("write: bad path %s\n", argv[1]);
+		return;
+	}
+	char name[VFS_NAME_MAX];
+	strlcpy(name, leaf, sizeof(name));
+	char *slash = strchr(name, '/');
+	if (slash)
+		*slash = '\0';
+
+	VfsNode *f = vfs_resolve(argv[1], cwd);
+	if (!f)
+		f = vfs_create(dir, name, false);
+	if (!f || f->is_dir || f->readonly)
+	{
+		term_printf("write: cannot write %s\n", argv[1]);
+		return;
+	}
+
+	vfs_truncate(f, 0);
+	size_t off = 0;
+	for (int i = 2; i < argc; i++)
+	{
+		if (i > 2)
+			vfs_write(f, " ", off++, 1);
+		vfs_write(f, argv[i], off, strlen(argv[i]));
+		off += strlen(argv[i]);
+	}
+	vfs_write(f, "\n", off, 1);
+}
+
+static void cmd_mkdir(int argc, char **argv)
+{
+	if (argc < 2)
+	{
+		term_print("usage: mkdir <dir>\n");
+		return;
+	}
+	if (!vfs_mkdirs(argv[1], cwd))
+		term_printf("mkdir: cannot create %s\n", argv[1]);
+}
+
+static void cmd_rm(int argc, char **argv)
+{
+	if (argc < 2)
+	{
+		term_print("usage: rm <path>\n");
+		return;
+	}
+	VfsNode *n = vfs_resolve(argv[1], cwd);
+	if (!n)
+	{
+		term_printf("rm: %s: not found\n", argv[1]);
+		return;
+	}
+	if (vfs_unlink(n) < 0)
+		term_printf("rm: cannot remove %s\n", argv[1]);
+}
+
+static void cmd_cd(int argc, char **argv)
+{
+	if (argc < 2)
+	{
+		cwd = vfs_root();
+		return;
+	}
+	VfsNode *n = vfs_resolve(argv[1], cwd);
+	if (!n || !n->is_dir)
+	{
+		term_printf("cd: %s: not a directory\n", argv[1]);
+		return;
+	}
+	cwd = n;
+}
+
+static void cmd_pwd(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	char path[128];
+	vfs_node_path(cwd, path, sizeof(path));
+	term_printf("%s\n", path);
+}
+
+static void cmd_reboot(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	outb(0x64, 0xFE); // 8042 CPU reset pulse
+}
+
+static void cmd_shutdown(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	outw(0x604, 0x2000); // QEMU q35 ACPI S5
+	term_print("shutdown failed (not running under QEMU?)\n");
+}
+
+static void cmd_sleep(int argc, char **argv)
+{
+	if (argc < 2)
+	{
+		term_print("usage: sleep <ms>\n");
+		return;
+	}
+	sleep_ms((uint64_t)atoi(argv[1]));
+}
+
+static const Command commands[] = {
+	{"help", "list commands", cmd_help},
+	{"fetch", "system info", cmd_fetch},
+	{"ping", "pong", cmd_ping},
+	{"clear", "clear the screen", cmd_clear},
+	{"echo", "print arguments", cmd_echo},
+	{"uptime", "time since boot", cmd_uptime},
+	{"free", "heap usage", cmd_free},
+	{"ls", "list directory", cmd_ls},
+	{"cat", "print file contents", cmd_cat},
+	{"write", "write text to a file", cmd_write},
+	{"mkdir", "create directory", cmd_mkdir},
+	{"rm", "remove file or empty dir", cmd_rm},
+	{"cd", "change directory", cmd_cd},
+	{"pwd", "print working directory", cmd_pwd},
+	{"ps", "list threads", cmd_ps},
+	{"sleep", "sleep N milliseconds", cmd_sleep},
+	{"snake", "play snake", cmd_snake},
+	{"pong", "play pong", cmd_pong},
+	{"memmap", "physical memory map", cmd_memmap},
+	{"testmalloc", "heap self-test", cmd_testmalloc},
+	{"reboot", "reboot the machine", cmd_reboot},
+	{"shutdown", "power off", cmd_shutdown},
+};
+
+#define COMMAND_COUNT (sizeof(commands) / sizeof(commands[0]))
+
+static void cmd_help(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	for (unsigned i = 0; i < COMMAND_COUNT; i++)
+	{
+		char buf[80];
+		snprintf(buf, sizeof(buf), "  %-12s %s\n", commands[i].name,
+				 commands[i].help);
+		term_print(buf);
+	}
+}
+
+static void process_command(char *line)
+{
+	char *argv[ARGV_MAX];
+	int argc = 0;
+
+	char *p = line;
+	while (*p && argc < ARGV_MAX)
+	{
+		while (*p == ' ' || *p == '\t')
+			p++;
+		if (!*p)
+			break;
+		argv[argc++] = p;
+		while (*p && *p != ' ' && *p != '\t')
+			p++;
+		if (*p)
+			*p++ = '\0';
+	}
+	if (argc == 0)
+		return;
+
+	for (unsigned i = 0; i < COMMAND_COUNT; i++)
+	{
+		if (strcmp(argv[0], commands[i].name) == 0)
+		{
+			commands[i].fn(argc, argv);
+			return;
+		}
+	}
+	term_printf("%s: command not found (try 'help')\n", argv[0]);
+}
+
+static void redraw_line(const char *buf, int old_len)
+{
+	for (int i = 0; i < old_len; i++)
+		term_print("\b");
+	term_print(buf);
+	int new_len = (int)strlen(buf);
+	for (int i = new_len; i < old_len; i++)
+		term_print(" ");
+	for (int i = new_len; i < old_len; i++)
+		term_print("\b");
+}
+
+void shell_init(void)
+{
+	char buf[LINE_MAX];
+	int len = 0;
+	int hist_pos = -1;
+
+	cwd = vfs_root();
+
+	term_print_with_color("\n  Welcome to ", TERM_COLOR_WHITE, TERM_COLOR_BLACK);
+	term_print_with_color("Choco OS", TERM_COLOR_MAGENTA, TERM_COLOR_BLACK);
+	term_print(" - type 'help' for commands\n\n");
+
+	prompt();
+
+	for (;;)
+	{
+		KeyEvent ev = kbd_wait_event();
+
+		if (ev.code == KEY_UP || ev.code == KEY_DOWN)
+		{
+			if (history_count == 0)
+				continue;
+			if (ev.code == KEY_UP && hist_pos + 1 < history_count)
+				hist_pos++;
+			else if (ev.code == KEY_DOWN && hist_pos >= 0)
+				hist_pos--;
+			int old_len = len;
+			if (hist_pos < 0)
+				buf[0] = '\0';
+			else
+				strlcpy(buf, history[history_count - 1 - hist_pos], LINE_MAX);
+			len = (int)strlen(buf);
+			redraw_line(buf, old_len);
 			continue;
 		}
-		if (key == ENTER)
+
+		if (ev.code != KEY_CHAR)
+			continue;
+
+		if (ev.ctrl && (ev.ch == 'l' || ev.ch == 'L'))
+		{
+			term_clear(TERM_COLOR_BLACK);
+			buf[len] = '\0';
+			prompt();
+			term_print(buf);
+			continue;
+		}
+		if (ev.ctrl && (ev.ch == 'c' || ev.ch == 'C'))
+		{
+			term_print("^C\n");
+			len = 0;
+			hist_pos = -1;
+			prompt();
+			continue;
+		}
+		if (ev.ctrl)
+			continue;
+
+		if (ev.ch == '\n')
 		{
 			term_print("\n");
+			buf[len] = '\0';
 
-			buf[buf_index] = '\0';
-			process_command(buf);
+			if (len > 0)
+			{
+				if (history_count == 0 ||
+					strcmp(history[history_count - 1], buf) != 0)
+				{
+					if (history_count == HISTORY_MAX)
+					{
+						for (int i = 1; i < HISTORY_MAX; i++)
+							strcpy(history[i - 1], history[i]);
+						history_count--;
+					}
+					strcpy(history[history_count++], buf);
+				}
+				process_command(buf);
+			}
 
-			buf_index = 0;
-
+			len = 0;
+			hist_pos = -1;
+			prompt();
 			continue;
 		}
 
-		if (key == BACKSPACE)
+		if (ev.ch == '\b')
 		{
-			if (buf_index > 0)
+			if (len > 0)
 			{
-				buf_index--;
-				term_print_char('\b', 0xFFFFFF, 0x000000);
+				len--;
+				term_print_char('\b', term_get_fg(), term_get_bg());
 			}
 			continue;
 		}
 
-		char c = keyboard_key_to_char(key);
-		if (c != '\0' && buf_index < sizeof(buf) - 1)
+		if (len < LINE_MAX - 1 && ev.ch >= 32 && ev.ch < 127)
 		{
-			buf[buf_index] = c;
-			buf_index++;
-
-			term_print_char(c, 0xFFFFFF, 0x000000);
+			buf[len++] = ev.ch;
+			term_print_char(ev.ch, term_get_fg(), term_get_bg());
 		}
 	}
 }

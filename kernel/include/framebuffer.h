@@ -14,6 +14,7 @@ uint64_t framebuffer_get_height();
 uint32_t framebuffer_get_font_width();
 uint32_t framebuffer_get_font_height();
 void framebuffer_draw_rect(uint64_t ul_x, uint64_t ul_y, uint64_t width, uint64_t height, uint32_t color);
+void framebuffer_scroll_up(uint64_t pixels, uint32_t color);
 void framebuffer_swap();
 void framebuffer_set_double_buffer(bool enabled);
 

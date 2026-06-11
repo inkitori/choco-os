@@ -160,7 +160,7 @@ void pong_init()
 			framebuffer_set_double_buffer(false);
 			return;
 		}
-		if (timer_get_ticks() - start_time >= 1) // Faster than snake
+		if (timer_get_ticks() - start_time >= 40) // Faster than snake
 		{
 			start_time = timer_get_ticks();
 			pong_update();

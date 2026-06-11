@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include "framebuffer.h"
 #include "asm_utils.h"
+#include "string.h"
 
 __attribute__((used, section(".requests"))) static volatile struct limine_framebuffer_request framebuffer_request = {
 	.id = LIMINE_FRAMEBUFFER_REQUEST,
@@ -81,12 +82,34 @@ void framebuffer_init()
 
 void framebuffer_clear(uint32_t color)
 {
-	for (uint64_t x = 0; x < framebuffer->width; x++)
+	for (uint64_t y = 0; y < framebuffer->height; y++)
 	{
-		for (uint64_t y = 0; y < framebuffer->height; y++)
+		for (uint64_t x = 0; x < framebuffer->width; x++)
 		{
 			framebuffer_draw_pixel(x, y, color);
 		}
+	}
+}
+
+// Scroll the visible framebuffer up by `pixels` rows, filling the exposed
+// area at the bottom with `color`. Writes directly to the front buffer.
+void framebuffer_scroll_up(uint64_t pixels, uint32_t color)
+{
+	if (pixels == 0 || pixels > framebuffer->height)
+		return;
+
+	uint8_t *fb = (uint8_t *)framebuffer->address;
+	size_t pitch = framebuffer->pitch;
+	uint64_t height = framebuffer->height;
+	uint64_t width = framebuffer->width;
+
+	memmove(fb, fb + pixels * pitch, (height - pixels) * pitch);
+
+	for (uint64_t y = height - pixels; y < height; y++)
+	{
+		uint32_t *line = (uint32_t *)(fb + y * pitch);
+		for (uint64_t x = 0; x < width; x++)
+			line[x] = color;
 	}
 }
 
