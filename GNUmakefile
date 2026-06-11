@@ -11,7 +11,7 @@ all-hdd: $(IMAGE_NAME).hdd
 
 .PHONY: run
 run: $(IMAGE_NAME).iso
-	qemu-system-x86_64 -M q35 -m 2G -cdrom $(IMAGE_NAME).iso -boot d
+	qemu-system-x86_64 -M q35 -m 2G -cdrom $(IMAGE_NAME).iso -boot d -device e1000,netdev=n0 -netdev user,id=n0
 
 .PHONY: run-uefi
 run-uefi: ovmf $(IMAGE_NAME).iso

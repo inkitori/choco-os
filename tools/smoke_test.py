@@ -30,9 +30,6 @@ def main():
         check("models registered", "stories15M.bin" in boot)
         check("timer at 1000 Hz", "PIT at 1000 Hz" in boot)
 
-        run_cmd(q, "ping")
-        check("ping -> pong", "pong" in q.serial())
-
         run_cmd(q, "echo Shift+Symbols OK: @#$%")
         check("echo with symbols", "Shift+Symbols OK: @#$%" in q.serial())
 

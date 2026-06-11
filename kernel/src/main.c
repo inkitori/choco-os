@@ -20,6 +20,7 @@
 #include "timer.h"
 #include "sched.h"
 #include "initrd.h"
+#include "net.h"
 
 __attribute__((used, section(".requests"))) static volatile LIMINE_BASE_REVISION(2);
 
@@ -86,6 +87,7 @@ void _start(void)
 	pic_init();
 	idt_init();
 	sched_init();
+	net_init();
 
 	thread_create("shell", shell_thread, NULL);
 	sched_start(); // becomes the idle thread, never returns

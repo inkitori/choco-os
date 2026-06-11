@@ -47,6 +47,7 @@ class Qemu:
             "-display", "none",
             "-monitor", f"unix:{self.mon_path},server,nowait",
             "-serial", f"file:{self.serial_log}",
+            "-device", "e1000,netdev=n0", "-netdev", "user,id=n0",
         ]
         if extra:
             cmd += extra

@@ -19,6 +19,7 @@
 #include "serial.h"
 #include "chat.h"
 #include "rtc.h"
+#include "net.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -85,13 +86,6 @@ static void cmd_fetch(int argc, char **argv)
 	term_print_with_color("Memory: ", key_color, TERM_COLOR_BLACK);
 	term_print(membuf);
 	term_print("\n");
-}
-
-static void cmd_ping(int argc, char **argv)
-{
-	(void)argc;
-	(void)argv;
-	term_print("pong\n");
 }
 
 static void cmd_clear(int argc, char **argv)
@@ -344,6 +338,110 @@ static void cmd_sleep(int argc, char **argv)
 	sleep_ms((uint64_t)atoi(argv[1]));
 }
 
+static bool net_ensure(void)
+{
+	if (!net_up())
+	{
+		term_print("no network card (run QEMU with -device e1000)\n");
+		return false;
+	}
+	if (!net_configured())
+	{
+		term_print("acquiring address via DHCP...\n");
+		if (!net_dhcp(5000))
+		{
+			term_print_error("DHCP failed\n");
+			return false;
+		}
+	}
+	return true;
+}
+
+static void cmd_ifconfig(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	if (!net_ensure())
+		return;
+
+	uint8_t mac[6];
+	net_mac(mac);
+	char ip[16], mask[16], gw[16], dns[16];
+	ip_to_str(net_ip(), ip);
+	ip_to_str(net_mask(), mask);
+	ip_to_str(net_gateway(), gw);
+	ip_to_str(net_dns_server(), dns);
+
+	term_printf("eth0: %s\n", ip);
+	term_printf("  mask %s  gateway %s  dns %s\n", mask, gw, dns);
+	term_printf("  mac %02x:%02x:%02x:%02x:%02x:%02x\n", mac[0], mac[1],
+				mac[2], mac[3], mac[4], mac[5]);
+}
+
+static void cmd_ping(int argc, char **argv)
+{
+	if (argc < 2)
+	{
+		term_print("usage: ping <host> [count]\n");
+		return;
+	}
+	if (!net_ensure())
+		return;
+
+	uint32_t ip;
+	if (!net_resolve(argv[1], &ip, 3000))
+	{
+		term_printf("ping: cannot resolve %s\n", argv[1]);
+		return;
+	}
+
+	char ipstr[16];
+	ip_to_str(ip, ipstr);
+	int count = argc > 2 ? atoi(argv[2]) : 4;
+	if (count < 1 || count > 100)
+		count = 4;
+
+	int received = 0;
+	for (int i = 0; i < count; i++)
+	{
+		int rtt = net_ping(ip, (uint16_t)(i + 1), 2000);
+		if (rtt >= 0)
+		{
+			term_printf("64 bytes from %s: icmp_seq=%d time=%d ms\n", ipstr,
+						i + 1, rtt);
+			received++;
+		}
+		else
+		{
+			term_printf("icmp_seq=%d timeout\n", i + 1);
+		}
+		if (i + 1 < count)
+			sleep_ms(500);
+	}
+	term_printf("--- %s: %d/%d received ---\n", ipstr, received, count);
+}
+
+static void cmd_nslookup(int argc, char **argv)
+{
+	if (argc < 2)
+	{
+		term_print("usage: nslookup <name>\n");
+		return;
+	}
+	if (!net_ensure())
+		return;
+
+	uint32_t ip;
+	if (!net_resolve(argv[1], &ip, 3000))
+	{
+		term_printf("nslookup: cannot resolve %s\n", argv[1]);
+		return;
+	}
+	char ipstr[16];
+	ip_to_str(ip, ipstr);
+	term_printf("%s -> %s\n", argv[1], ipstr);
+}
+
 static void cmd_date(int argc, char **argv)
 {
 	(void)argc;
@@ -464,7 +562,6 @@ static void cmd_llm(int argc, char **argv)
 static const Command commands[] = {
 	{"help", "list commands", cmd_help},
 	{"fetch", "system info", cmd_fetch},
-	{"ping", "pong", cmd_ping},
 	{"clear", "clear the screen", cmd_clear},
 	{"echo", "print arguments", cmd_echo},
 	{"uptime", "time since boot", cmd_uptime},
@@ -477,6 +574,9 @@ static const Command commands[] = {
 	{"cd", "change directory", cmd_cd},
 	{"pwd", "print working directory", cmd_pwd},
 	{"ps", "list threads", cmd_ps},
+	{"ifconfig", "network status (runs DHCP)", cmd_ifconfig},
+	{"ping", "ICMP echo a host", cmd_ping},
+	{"nslookup", "resolve a hostname", cmd_nslookup},
 	{"date", "read the real-time clock", cmd_date},
 	{"history", "show command history", cmd_history},
 	{"sleep", "sleep N milliseconds", cmd_sleep},
