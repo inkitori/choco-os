@@ -17,6 +17,7 @@
 #include "lib.h"
 #include "llm.h"
 #include "serial.h"
+#include "chat.h"
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -342,6 +343,18 @@ static void cmd_sleep(int argc, char **argv)
 	sleep_ms((uint64_t)atoi(argv[1]));
 }
 
+static void cmd_chat(int argc, char **argv)
+{
+	(void)argc;
+	(void)argv;
+	term_set_cursor_visible(false);
+	kbd_flush();
+	chat_run();
+	kbd_flush();
+	term_set_cursor_visible(true);
+	term_clear(TERM_COLOR_BLACK);
+}
+
 static void llm_emit_term(const char *piece, void *ud)
 {
 	(void)ud;
@@ -444,6 +457,7 @@ static const Command commands[] = {
 	{"ps", "list threads", cmd_ps},
 	{"sleep", "sleep N milliseconds", cmd_sleep},
 	{"llm", "generate text with the in-kernel LLM", cmd_llm},
+	{"chat", "ChocoCord: chat with the LLM bots", cmd_chat},
 	{"snake", "play snake", cmd_snake},
 	{"pong", "play pong", cmd_pong},
 	{"memmap", "physical memory map", cmd_memmap},
