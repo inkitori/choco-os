@@ -531,7 +531,7 @@ static void cmd_llm(int argc, char **argv)
 	{
 		term_print("usage: llm [-m model] [-n tokens] [-t temp%] [-p topp%] <prompt>\n");
 		term_print("       llm -i [-m model]    show model info\n");
-		term_print("models: stories15M (default), stories260K (fast)\n");
+		term_print("models: stories15M (default), stories260K (fast), qwen3 (chat, slow)\n");
 		return;
 	}
 

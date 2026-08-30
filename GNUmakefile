@@ -3,6 +3,11 @@ override MAKEFLAGS += -rR
 
 override IMAGE_NAME := template
 
+# On macOS, let the QEMU window be freely resized (guest display scales to fit).
+ifeq ($(shell uname -s),Darwin)
+override QEMU_DISPLAY := -display cocoa,zoom-to-fit=on
+endif
+
 .PHONY: all
 all: $(IMAGE_NAME).iso
 
@@ -11,19 +16,19 @@ all-hdd: $(IMAGE_NAME).hdd
 
 .PHONY: run
 run: $(IMAGE_NAME).iso
-	qemu-system-x86_64 -M q35 -m 2G -cdrom $(IMAGE_NAME).iso -boot d -device e1000,netdev=n0 -netdev user,id=n0
+	qemu-system-x86_64 -M q35 -m 4G $(QEMU_DISPLAY) -cdrom $(IMAGE_NAME).iso -boot d -device e1000,netdev=n0 -netdev user,id=n0
 
 .PHONY: run-uefi
 run-uefi: ovmf $(IMAGE_NAME).iso
-	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -cdrom $(IMAGE_NAME).iso -boot d
+	qemu-system-x86_64 -M q35 -m 4G $(QEMU_DISPLAY) -bios ovmf/OVMF.fd -cdrom $(IMAGE_NAME).iso -boot d
 
 .PHONY: run-hdd
 run-hdd: $(IMAGE_NAME).hdd
-	qemu-system-x86_64 -M q35 -m 2G -hda $(IMAGE_NAME).hdd
+	qemu-system-x86_64 -M q35 -m 4G $(QEMU_DISPLAY) -hda $(IMAGE_NAME).hdd
 
 .PHONY: run-hdd-uefi
 run-hdd-uefi: ovmf $(IMAGE_NAME).hdd
-	qemu-system-x86_64 -M q35 -m 2G -bios ovmf/OVMF.fd -hda $(IMAGE_NAME).hdd
+	qemu-system-x86_64 -M q35 -m 4G $(QEMU_DISPLAY) -bios ovmf/OVMF.fd -hda $(IMAGE_NAME).hdd
 
 ovmf:
 	mkdir -p ovmf
@@ -39,7 +44,7 @@ kernel:
 	$(MAKE) -C kernel
 
 # LLM model weights + tokenizers (not committed; fetched from HuggingFace).
-MODEL_FILES := models/stories15M.bin models/stories260K.bin models/tokenizer.bin models/tok512.bin
+MODEL_FILES := models/stories15M.bin models/stories260K.bin models/tokenizer.bin models/tok512.bin models/qwen3.bin models/qwen3.tokenizer
 
 .PHONY: models
 models: $(MODEL_FILES)
@@ -59,6 +64,21 @@ models/tok512.bin:
 models/tokenizer.bin:
 	mkdir -p models
 	curl -Lo $@ https://github.com/karpathy/llama2.c/raw/master/tokenizer.bin
+
+# Qwen3-0.6B: download the HF snapshot, then quantize to Q8_0 with the
+# export script (models/qwen3.bin + models/qwen3.tokenizer, ~635 MB).
+QWEN3_HF := models/hf-qwen3-0.6b
+QWEN3_URL := https://huggingface.co/Qwen/Qwen3-0.6B/resolve/main
+
+$(QWEN3_HF)/model.safetensors:
+	mkdir -p $(QWEN3_HF)
+	curl -Lo $(QWEN3_HF)/config.json $(QWEN3_URL)/config.json
+	curl -Lo $(QWEN3_HF)/tokenizer.json $(QWEN3_URL)/tokenizer.json
+	curl -Lo $(QWEN3_HF)/tokenizer_config.json $(QWEN3_URL)/tokenizer_config.json
+	curl -Lo $@ $(QWEN3_URL)/model.safetensors
+
+models/qwen3.bin models/qwen3.tokenizer: $(QWEN3_HF)/model.safetensors tools/export_qwen3.py
+	uv run tools/export_qwen3.py $(QWEN3_HF) models/qwen3
 
 initrd.tar: $(shell find initrd -type f)
 	tar --format ustar -C initrd -cf $@ .

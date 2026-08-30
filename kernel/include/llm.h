@@ -9,9 +9,10 @@
 typedef void (*llm_emit_fn)(const char *piece, void *ud);
 
 // Returns number of tokens generated, or a negative error code.
-// model: "stories15M" or "stories260K".
+// model: "stories15M", "stories260K", or "qwen3" (Qwen3-0.6B instruct;
+// the prompt is wrapped in its chat template and answered, see qwen.c).
 // max_tokens: 0 means the model's full context length.
-// echo_prompt: also emit the prompt tokens during prefill.
+// echo_prompt: also emit the prompt tokens during prefill (llama only).
 int llm_generate(const char *model, const char *prompt, int max_tokens,
 				 int temp_centi, int topp_centi, unsigned long seed,
 				 int echo_prompt, llm_emit_fn emit, void *ud);

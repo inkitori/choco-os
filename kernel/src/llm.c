@@ -5,7 +5,9 @@
 // This translation unit is compiled with SSE enabled (hard float); the
 // kernel proper is soft-float. No float crosses the llm.h API boundary.
 #include "llm.h"
+#include "llm_common.h"
 #include "llm_math.h"
+#include "qwen.h"
 #include "malloc.h"
 #include "string.h"
 #include "kprintf.h"
@@ -130,22 +132,6 @@ static void rmsnorm(float *o, float *x, float *weight, int size)
 		o[j] = weight[j] * (ss * x[j]);
 }
 
-static void softmax(float *x, int size)
-{
-	float max_val = x[0];
-	for (int i = 1; i < size; i++)
-		if (x[i] > max_val)
-			max_val = x[i];
-	float sum = 0.0f;
-	for (int i = 0; i < size; i++)
-	{
-		x[i] = expf_k(x[i] - max_val);
-		sum += x[i];
-	}
-	for (int i = 0; i < size; i++)
-		x[i] /= sum;
-}
-
 // W (d,n) @ x (n,) -> xout (d,). Unrolled with 4 accumulators: this is
 // where nearly all the cycles go, and TCG appreciates the ILP.
 static void matmul(float *xout, const float *x, const float *w, int n, int d)
@@ -232,7 +218,7 @@ static float *forward(Transformer *t, int token, int pos)
 				att[tp] = score / sqrtf_k((float)head_size);
 			}
 
-			softmax(att, pos + 1);
+			llm_softmax(att, pos + 1);
 
 			float *xb = s->xb + (uint64_t)h * head_size;
 			memset(xb, 0, head_size * sizeof(float));
@@ -275,12 +261,6 @@ static float *forward(Transformer *t, int token, int pos)
 
 typedef struct
 {
-	const char *str;
-	int id;
-} TokenIndex;
-
-typedef struct
-{
 	char **vocab;
 	float *vocab_scores;
 	TokenIndex *sorted_vocab;
@@ -288,72 +268,6 @@ typedef struct
 	unsigned int max_token_length;
 	unsigned char byte_pieces[512]; // stores all single-byte strings
 } Tokenizer;
-
-static int compare_tokens(const TokenIndex *a, const TokenIndex *b)
-{
-	return strcmp(a->str, b->str);
-}
-
-// In-place heapsort: no recursion, no libc qsort.
-static void sort_tokens(TokenIndex *arr, int n)
-{
-	for (int start = n / 2 - 1; start >= 0; start--)
-	{
-		int root = start;
-		for (;;)
-		{
-			int child = 2 * root + 1;
-			if (child >= n)
-				break;
-			if (child + 1 < n && compare_tokens(&arr[child], &arr[child + 1]) < 0)
-				child++;
-			if (compare_tokens(&arr[root], &arr[child]) >= 0)
-				break;
-			TokenIndex tmp = arr[root];
-			arr[root] = arr[child];
-			arr[child] = tmp;
-			root = child;
-		}
-	}
-	for (int end = n - 1; end > 0; end--)
-	{
-		TokenIndex tmp = arr[0];
-		arr[0] = arr[end];
-		arr[end] = tmp;
-		int root = 0;
-		for (;;)
-		{
-			int child = 2 * root + 1;
-			if (child >= end)
-				break;
-			if (child + 1 < end && compare_tokens(&arr[child], &arr[child + 1]) < 0)
-				child++;
-			if (compare_tokens(&arr[root], &arr[child]) >= 0)
-				break;
-			TokenIndex t2 = arr[root];
-			arr[root] = arr[child];
-			arr[child] = t2;
-			root = child;
-		}
-	}
-}
-
-static int str_lookup(const char *str, TokenIndex *sorted_vocab, int vocab_size)
-{
-	int lo = 0, hi = vocab_size - 1;
-	while (lo <= hi)
-	{
-		int mid = (lo + hi) / 2;
-		int c = strcmp(str, sorted_vocab[mid].str);
-		if (c == 0)
-			return sorted_vocab[mid].id;
-		if (c < 0)
-			hi = mid - 1;
-		else
-			lo = mid + 1;
-	}
-	return -1;
-}
 
 static int build_tokenizer(Tokenizer *t, const uint8_t *data, uint64_t size,
 						   int vocab_size)
@@ -404,7 +318,7 @@ static int build_tokenizer(Tokenizer *t, const uint8_t *data, uint64_t size,
 		t->sorted_vocab[i].str = t->vocab[i];
 		t->sorted_vocab[i].id = i;
 	}
-	sort_tokens(t->sorted_vocab, vocab_size);
+	tok_sort(t->sorted_vocab, vocab_size);
 	return 0;
 }
 
@@ -439,7 +353,7 @@ static void encode(Tokenizer *t, const char *text, int bos, int eos,
 	// dummy prefix: sentencepiece prepends a space to non-empty input
 	if (text[0] != '\0')
 	{
-		int dummy_prefix = str_lookup(" ", t->sorted_vocab, t->vocab_size);
+		int dummy_prefix = tok_lookup(" ", t->sorted_vocab, t->vocab_size);
 		if (dummy_prefix != -1)
 			tokens[(*n_tokens)++] = dummy_prefix;
 	}
@@ -457,7 +371,7 @@ static void encode(Tokenizer *t, const char *text, int bos, int eos,
 		if ((*(c + 1) & 0xC0) == 0x80 && str_len < 4)
 			continue;
 
-		int id = str_lookup(str_buffer, t->sorted_vocab, t->vocab_size);
+		int id = tok_lookup(str_buffer, t->sorted_vocab, t->vocab_size);
 		if (id != -1)
 		{
 			tokens[(*n_tokens)++] = id;
@@ -482,7 +396,7 @@ static void encode(Tokenizer *t, const char *text, int bos, int eos,
 		{
 			snprintf(str_buffer, t->max_token_length * 2 + 3, "%s%s",
 					 t->vocab[tokens[i]], t->vocab[tokens[i + 1]]);
-			int id = str_lookup(str_buffer, t->sorted_vocab, t->vocab_size);
+			int id = tok_lookup(str_buffer, t->sorted_vocab, t->vocab_size);
 			if (id != -1 && t->vocab_scores[id] > best_score)
 			{
 				best_score = t->vocab_scores[id];
@@ -504,201 +418,6 @@ static void encode(Tokenizer *t, const char *text, int bos, int eos,
 		tokens[(*n_tokens)++] = 2;
 
 	free(str_buffer);
-}
-
-// The terminal font is ASCII-only; map common UTF-8 punctuation the model
-// emits (smart quotes, dashes) to ASCII and drop anything else non-printable.
-static void emit_sanitized(const char *piece, llm_emit_fn emit, void *ud)
-{
-	char out[80];
-	size_t o = 0;
-	const unsigned char *p = (const unsigned char *)piece;
-
-	while (*p && o < sizeof(out) - 4)
-	{
-		unsigned char c = *p;
-		if (c == '\n' || c == '\t' || (c >= 32 && c < 127))
-		{
-			out[o++] = (char)c;
-			p++;
-			continue;
-		}
-
-		unsigned int cp = 0;
-		if ((c & 0xE0) == 0xC0 && (p[1] & 0xC0) == 0x80)
-		{
-			cp = ((c & 0x1F) << 6) | (p[1] & 0x3F);
-			p += 2;
-		}
-		else if ((c & 0xF0) == 0xE0 && (p[1] & 0xC0) == 0x80 &&
-				 (p[2] & 0xC0) == 0x80)
-		{
-			cp = ((c & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-			p += 3;
-		}
-		else
-		{
-			p++;
-			continue;
-		}
-
-		switch (cp)
-		{
-		case 0x2018:
-		case 0x2019:
-			out[o++] = '\'';
-			break;
-		case 0x201C:
-		case 0x201D:
-			out[o++] = '"';
-			break;
-		case 0x2013:
-		case 0x2014:
-			out[o++] = '-';
-			break;
-		case 0x2026:
-			out[o++] = '.';
-			out[o++] = '.';
-			out[o++] = '.';
-			break;
-		default:
-			break; // drop
-		}
-	}
-
-	if (o > 0)
-	{
-		out[o] = '\0';
-		emit(out, ud);
-	}
-}
-
-// ---------------- sampler ----------------
-
-typedef struct
-{
-	float prob;
-	int index;
-} ProbIndex;
-
-typedef struct
-{
-	int vocab_size;
-	ProbIndex *probindex;
-	float temperature;
-	float topp;
-	uint64_t rng_state;
-} Sampler;
-
-static unsigned int random_u32(uint64_t *state)
-{
-	*state ^= *state >> 12;
-	*state ^= *state << 25;
-	*state ^= *state >> 27;
-	return (*state * 0x2545F4914F6CDD1Dull) >> 32;
-}
-
-static float random_f32(uint64_t *state)
-{
-	return (random_u32(state) >> 8) / 16777216.0f;
-}
-
-static int sample_argmax(float *probabilities, int n)
-{
-	int max_i = 0;
-	float max_p = probabilities[0];
-	for (int i = 1; i < n; i++)
-	{
-		if (probabilities[i] > max_p)
-		{
-			max_i = i;
-			max_p = probabilities[i];
-		}
-	}
-	return max_i;
-}
-
-static int sample_mult(float *probabilities, int n, float coin)
-{
-	float cdf = 0.0f;
-	for (int i = 0; i < n; i++)
-	{
-		cdf += probabilities[i];
-		if (coin < cdf)
-			return i;
-	}
-	return n - 1;
-}
-
-static void sort_probindex(ProbIndex *arr, int n)
-{
-	// insertion sort descending by prob (the top-p candidate list is small)
-	for (int i = 1; i < n; i++)
-	{
-		ProbIndex key = arr[i];
-		int j = i - 1;
-		while (j >= 0 && arr[j].prob < key.prob)
-		{
-			arr[j + 1] = arr[j];
-			j--;
-		}
-		arr[j + 1] = key;
-	}
-}
-
-static int sample_topp(float *probabilities, int n, float topp,
-					   ProbIndex *probindex, float coin)
-{
-	int n0 = 0;
-	// cut tokens whose probability can't make the nucleus
-	const float cutoff = (1.0f - topp) / (n - 1);
-	for (int i = 0; i < n; i++)
-	{
-		if (probabilities[i] >= cutoff)
-		{
-			probindex[n0].index = i;
-			probindex[n0].prob = probabilities[i];
-			n0++;
-		}
-	}
-	sort_probindex(probindex, n0);
-
-	float cumulative_prob = 0.0f;
-	int last_idx = n0 - 1;
-	for (int i = 0; i < n0; i++)
-	{
-		cumulative_prob += probindex[i].prob;
-		if (cumulative_prob > topp)
-		{
-			last_idx = i;
-			break;
-		}
-	}
-
-	float r = coin * cumulative_prob;
-	float cdf = 0.0f;
-	for (int i = 0; i <= last_idx; i++)
-	{
-		cdf += probindex[i].prob;
-		if (r < cdf)
-			return probindex[i].index;
-	}
-	return probindex[last_idx].index;
-}
-
-static int sample(Sampler *s, float *logits)
-{
-	if (s->temperature == 0.0f)
-		return sample_argmax(logits, s->vocab_size);
-
-	for (int q = 0; q < s->vocab_size; q++)
-		logits[q] /= s->temperature;
-	softmax(logits, s->vocab_size);
-
-	float coin = random_f32(&s->rng_state);
-	if (s->topp <= 0 || s->topp >= 1)
-		return sample_mult(logits, s->vocab_size, coin);
-	return sample_topp(logits, s->vocab_size, s->topp, s->probindex, coin);
 }
 
 // ---------------- model registry ----------------
@@ -776,26 +495,27 @@ static ModelSlot *load_model(const char *model)
 	return slot;
 }
 
+static bool is_qwen(const char *model)
+{
+	return strcmp(model, "qwen3") == 0;
+}
+
 const char *llm_describe(const char *model)
 {
+	if (is_qwen(model))
+		return qwen_describe();
 	ModelSlot *slot = load_model(model);
 	return slot ? slot->describe : NULL;
 }
 
-int llm_generate(const char *model, const char *prompt, int max_tokens,
-				 int temp_centi, int topp_centi, unsigned long seed,
-				 int echo_prompt, llm_emit_fn emit, void *ud)
+static int llama_generate(const char *model, const char *prompt,
+						  int max_tokens, int temp_centi, int topp_centi,
+						  unsigned long seed, int echo_prompt,
+						  llm_emit_fn emit, void *ud)
 {
-	if (llm_busy)
-		return LLM_ERR_BUSY;
-	llm_busy = true;
-
 	ModelSlot *slot = load_model(model);
 	if (!slot)
-	{
-		llm_busy = false;
 		return LLM_ERR_NO_MODEL;
-	}
 
 	Transformer *t = &slot->transformer;
 	Tokenizer *tok = &slot->tokenizer;
@@ -807,10 +527,7 @@ int llm_generate(const char *model, const char *prompt, int max_tokens,
 	sampler.rng_state = seed ? seed : 42;
 	sampler.probindex = malloc(sampler.vocab_size * sizeof(ProbIndex));
 	if (!sampler.probindex)
-	{
-		llm_busy = false;
 		return LLM_ERR_OOM;
-	}
 
 	int steps = t->config.seq_len;
 	if (max_tokens > 0 && max_tokens < steps)
@@ -820,7 +537,6 @@ int llm_generate(const char *model, const char *prompt, int max_tokens,
 	if (!prompt_tokens)
 	{
 		free(sampler.probindex);
-		llm_busy = false;
 		return LLM_ERR_OOM;
 	}
 	int num_prompt_tokens = 0;
@@ -844,7 +560,7 @@ int llm_generate(const char *model, const char *prompt, int max_tokens,
 			next = prompt_tokens[pos + 1];
 		else
 		{
-			next = sample(&sampler, logits);
+			next = llm_sample(&sampler, logits);
 			sampled = true;
 			generated++;
 		}
@@ -870,6 +586,25 @@ int llm_generate(const char *model, const char *prompt, int max_tokens,
 
 	free(prompt_tokens);
 	free(sampler.probindex);
-	llm_busy = false;
 	return generated;
+}
+
+int llm_generate(const char *model, const char *prompt, int max_tokens,
+				 int temp_centi, int topp_centi, unsigned long seed,
+				 int echo_prompt, llm_emit_fn emit, void *ud)
+{
+	if (llm_busy)
+		return LLM_ERR_BUSY;
+	llm_busy = true;
+
+	int n;
+	if (is_qwen(model))
+		n = qwen_run(prompt, max_tokens, temp_centi, topp_centi, seed, emit,
+					 ud);
+	else
+		n = llama_generate(model, prompt, max_tokens, temp_centi, topp_centi,
+						   seed, echo_prompt, emit, ud);
+
+	llm_busy = false;
+	return n;
 }

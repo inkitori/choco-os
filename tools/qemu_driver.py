@@ -37,7 +37,7 @@ SHIFTMAP = {
 
 
 class Qemu:
-    def __init__(self, iso=ISO, mem="2G", serial_log=None, extra=None):
+    def __init__(self, iso=ISO, mem="4G", serial_log=None, extra=None):
         self.tmpdir = tempfile.mkdtemp(prefix="chocoqemu")
         self.mon_path = os.path.join(self.tmpdir, "mon.sock")
         self.serial_log = serial_log or os.path.join(self.tmpdir, "serial.log")

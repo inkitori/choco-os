@@ -117,7 +117,8 @@ void initrd_init(void)
 		kprintf("initrd: no initrd.tar module\n");
 
 	static const char *models[] = {
-		"stories15M.bin", "stories260K.bin", "tokenizer.bin", "tok512.bin"};
+		"stories15M.bin", "stories260K.bin", "tokenizer.bin", "tok512.bin",
+		"qwen3.bin", "qwen3.tokenizer"};
 	for (unsigned i = 0; i < sizeof(models) / sizeof(models[0]); i++)
 	{
 		struct limine_file *m = module_find(models[i]);

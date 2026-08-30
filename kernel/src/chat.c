@@ -30,7 +30,7 @@
 #define MSG_TEXT_MAX 2048
 #define MSGS_PER_CHANNEL 24
 #define INPUT_MAX 220
-#define NUM_CHANNELS 3
+#define NUM_CHANNELS 4
 
 typedef struct
 {
@@ -80,6 +80,14 @@ static Channel channels[NUM_CHANNELS] = {
 	 .model = "stories260K",
 	 .temp_centi = 140,
 	 .topp_centi = 98,
+	 .max_tokens = 200},
+	{.name = "# assistant",
+	 .topic = "ask qwenbot anything - real answers, slowly (Qwen3-0.6B)",
+	 .bot = "qwenbot",
+	 .bot_color = 0x9B59B6,
+	 .model = "qwen3",
+	 .temp_centi = 70,
+	 .topp_centi = 80,
 	 .max_tokens = 200},
 };
 
@@ -268,27 +276,43 @@ static void draw_chat(void)
 	for (int i = start; i < ch->msg_count; i++)
 		wrap_message(&ch->msgs[i % MSGS_PER_CHANNEL], width);
 
-	fill_cells(chat_x, chat_top, chat_cols, chat_rows, COL_CHAT);
-
+	// Repaint row by row, writing each cell exactly once: text first, then
+	// only the leftover cells. Blanking the whole panel before redrawing
+	// flashes on every keystroke / streamed token.
 	int visible = line_count < chat_rows ? line_count : chat_rows;
 	int src = line_count - visible;
-	for (int i = 0; i < visible; i++)
+	for (int i = 0; i < chat_rows; i++)
 	{
-		WrapLine *L = &lines[src + i];
 		int y = chat_top + i;
+		if (i >= visible)
+		{
+			fill_cells(chat_x, y, chat_cols, 1, COL_CHAT);
+			continue;
+		}
+
+		WrapLine *L = &lines[src + i];
+		int x = chat_x + 1;
+		fill_cells(chat_x, y, 1, 1, COL_CHAT); // left margin
 		if (L->author_line)
 		{
-			put_text(L->text, chat_x + 1, y, L->author_color, COL_CHAT);
+			put_text(L->text, x, y, L->author_color, COL_CHAT);
+			x += (int)strlen(L->text);
 			char ts[16];
 			snprintf(ts, sizeof(ts), " %02u:%02u", L->minutes / 60,
 					 L->minutes % 60);
-			put_text(ts, chat_x + 1 + (int)strlen(L->text), y, COL_MUTED,
-					 COL_CHAT);
+			put_text(ts, x, y, COL_MUTED, COL_CHAT);
+			x += (int)strlen(ts);
 		}
 		else
 		{
-			put_text_n(L->text, chat_cols - 2, chat_x + 1, y, L->fg, COL_CHAT);
+			int n = (int)strlen(L->text);
+			if (n > width)
+				n = width;
+			put_text_n(L->text, n, x, y, L->fg, COL_CHAT);
+			x += n;
 		}
+		if (x < chat_x + chat_cols)
+			fill_cells(x, y, chat_x + chat_cols - x, 1, COL_CHAT);
 	}
 }
 
@@ -297,31 +321,46 @@ static void draw_input(void)
 	Channel *ch = &channels[current_chan];
 	int y = rows - input_rows;
 
-	fill_cells(chat_x, y, chat_cols, input_rows, COL_CHAT);
-	fill_cells(chat_x + 1, y, chat_cols - 2, 1, COL_INPUT);
+	// Same one-write-per-cell discipline as draw_chat so the box and the
+	// typing indicator never flash mid-keystroke.
+	int right = chat_x + chat_cols;
+	fill_cells(chat_x, y, 1, 1, COL_CHAT);		// left margin
+	fill_cells(right - 1, y, 1, 1, COL_CHAT);	// right margin
+	fill_cells(chat_x + 1, y, 1, 1, COL_INPUT); // pad before text
 
+	int x = chat_x + 2;
 	if (input_len == 0)
 	{
 		char hint[64];
 		snprintf(hint, sizeof(hint), "Message %s", ch->name);
-		put_text(hint, chat_x + 2, y, COL_MUTED, COL_INPUT);
+		put_text(hint, x, y, COL_MUTED, COL_INPUT);
+		x += (int)strlen(hint);
 	}
 	else
 	{
 		int shown = input_len < chat_cols - 5 ? input_len
 											  : chat_cols - 5;
-		put_text_n(input + input_len - shown, shown, chat_x + 2, y, COL_TEXT,
+		put_text_n(input + input_len - shown, shown, x, y, COL_TEXT,
 				   COL_INPUT);
+		x += shown;
 		// block cursor
-		fill_cells(chat_x + 2 + shown, y, 1, 1, COL_TEXT);
+		fill_cells(x, y, 1, 1, COL_TEXT);
+		x++;
 	}
+	if (x < right - 1)
+		fill_cells(x, y, right - 1 - x, 1, COL_INPUT);
 
+	x = chat_x;
 	if (ch->typing)
 	{
 		char t[64];
 		snprintf(t, sizeof(t), "%s is typing...", ch->bot);
+		fill_cells(chat_x, y + 1, 2, 1, COL_CHAT);
 		put_text(t, chat_x + 2, y + 1, COL_MUTED, COL_CHAT);
+		x = chat_x + 2 + (int)strlen(t);
 	}
+	if (x < right)
+		fill_cells(x, y + 1, right - x, 1, COL_CHAT);
 }
 
 static void draw_all(void)
